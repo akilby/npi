@@ -1,3 +1,9 @@
+'''
+Code written collaboratively with @amin.p and @akilby
+
+Downloads all NBER npi data for years in yearlist and months in monthslist and variables in USE_VAR_LIST
+'''
+
 import wget
 import os
 import urllib.error
