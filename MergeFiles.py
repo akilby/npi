@@ -31,7 +31,7 @@ def concat_files_by_variable(variable):
                     print('Warning: data does not exist')
     df = pd.concat(df_list, axis=0)
     df = df.sort_values(['npi', 'month'])
-    return df.reset_index()
+    return df.reset_index(drop=True)
 
 
 for variable in USE_VAR_LIST:
