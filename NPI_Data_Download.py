@@ -10,8 +10,8 @@ import urllib.error
 import zipfile
 
 RAW_DATA_DIR = '/work/akilby/npi/raw'
-USE_VAR_LIST = ['taxcode', 'locline1','locline2','loccityname','locstatename','loczip']
-USE_MONTH_LIST= ['Jan', 'Feb', 'March', 'April', 'May', 'June', 'Jul', 'Aug','Sept','Oct','Nov','Dec']
+USE_VAR_LIST = ['enumdate', 'licnum', 'licstate', 'lname', 'lnamecode', 'lnameoth']
+USE_MONTH_LIST= ['Jan', 'Feb', 'March', 'April', 'May', 'June', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
 
 if not os.path.isdir(RAW_DATA_DIR):
 	os.makedirs(RAW_DATA_DIR)

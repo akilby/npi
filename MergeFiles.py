@@ -4,13 +4,13 @@ USE_VAR_LIST = ['taxcode', 'locline1', 'locline2',
                 'loccityname', 'locstatename', 'loczip']
 
 
-def concat_files_by_variable(variable):
+def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
     """
     Function reads in all normal NBER NPI/NPPES files, and
     concatenates all available months by variable
     """
     df_list = []
-    for year in range(2007, 2020):
+    for year in yearrange:
         for month in range(1, 13):
             file_path_stub = ('/work/akilby/npi/raw/p%s%s%s'
                               % (variable, year, month))
@@ -30,10 +30,23 @@ def concat_files_by_variable(variable):
                 except FileNotFoundError:
                     print('Warning: data does not exist')
     df = pd.concat(df_list, axis=0)
-    df = df.sort_values(['npi', 'month'])
+    # df = df.sort_values(['npi', 'month'])
     return df.reset_index(drop=True)
 
 
 for variable in USE_VAR_LIST:
-    df = concat_files_by_variable(variable)
-    df.to_stata('/work/akilby/npi/data/%s_nber.dta' % variable)
+    df = concat_files_by_variable(variable='locstatename')
+    df.to_csv('/work/akilby/npi/data/%s_nber.csv' % variable, index_col=False)
+
+
+def concat_backfiles_by_variable(variable):
+
+    backfile_list = ['npidata_20050523-20081110.csv',
+                     'npidata_20050523-20100111.csv',
+                     'npidata_20050523-20100208.csv',
+                     'npidata_20050523-20110314.csv']
+
+    Nov2008 = pd.read_csv('/work/akilby/npi/raw/npidata_20050523-20081110.csv',
+                          usecols=['NPI', 'Provider First Line Business Practice Location Address'])
+    Nov2008 = Nov2008.rename(columns={'NPI': 'npi', 'Provider First Line Business Practice Location Address': 'plocline1'})
+    Nov2008['month'] = pd.to_datetime('2008-11')
