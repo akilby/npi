@@ -1,3 +1,5 @@
+#!/bin/bash
+
 #SBATCH --mem=0
 #SBATCH --exclusive
 #SBATCH --time=1-00:00:00
