@@ -1,7 +1,6 @@
 import pandas as pd
 
-USE_VAR_LIST = ['taxcode', 'locline1', 'locline2',
-                'loccityname', 'locstatename', 'loczip']
+USE_VAR_LIST = ['taxcode', 'locline1', 'locline2']
 
 
 def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
@@ -35,8 +34,8 @@ def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
 
 
 for variable in USE_VAR_LIST:
-    df = concat_files_by_variable(variable='locstatename')
-    df.to_csv('/work/akilby/npi/data/%s_nber.csv' % variable, index_col=False)
+    df = concat_files_by_variable(variable)
+    df.to_csv('/work/akilby/npi/data/%s_nber.csv' % variable, index=False)
 
 
 def concat_backfiles_by_variable(variable):

@@ -4,7 +4,6 @@
 #SBATCH --exclusive
 #SBATCH --time=1-00:00:00
 #SBATCH --partition=reservation
-#SBATCH --wait=0
 #SBATCH --reservation=kilby
 #SBATCH --output=pyscript.out
 #SBATCH --error=pyscript.out
