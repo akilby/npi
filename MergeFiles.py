@@ -1,6 +1,6 @@
 import pandas as pd
 
-USE_VAR_LIST = ['taxcode', 'locline1', 'locline2']
+USE_VAR_LIST = ['taxcode', 'locline1', 'locline2', 'loccityname', 'locstatename', 'loczip', 'orgname', 'loctel', 'orgnameothcode', 'credential', 'credentialoth', 'fname', 'fnameoth', 'gender', 'lname', 'licnum', 'licstate', 'primtax']
 
 
 def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
