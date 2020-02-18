@@ -34,11 +34,6 @@ def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
 
 
 for variable in USE_VAR_LIST:
-    df = concat_files_by_variable(variable)
-    df.to_csv('/work/akilby/npi/data/%s_nber.csv' % variable, index=False)
-
-
-for variable in USE_VAR_LIST:
     df1 = concat_files_by_variable(variable)
     df2 = concat_backfiles_by_variable(variable)
     df = pd.concat([df1, df2], axis=0)
@@ -108,3 +103,16 @@ def concat_backfiles_by_variable(variable):
             df_main = pd.concat([df_main, df], axis=0)
             
     return df_main
+
+
+query_dataset = 'taxcode'
+query_string = 'NPI=="390200000X"'
+output_variables = ['locline1', 'locline2', 'loccityname', 'locstatename', 'loczip']
+
+
+def query_npi(query_dataset, query_string, output_variables):
+    # 1. read in appropriate dataset
+    # 2. do the query on the data, get out all the NPI-months that match
+    # 3. extract from each dataset for the output varables, for each NPI
+    df.query(query_string)
+    pass
