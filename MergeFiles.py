@@ -2,6 +2,7 @@ import pandas as pd
 
 USE_VAR_LIST = ['enumdate', 'taxcode', 'locline1', 'locline2', 'loccityname', 'locstatename', 'loczip', 'orgname', 'loctel', 'orgnameothcode', 'credential', 'credentialoth', 'fname', 'fnameoth', 'gender', 'lname', 'licnum', 'licstate', 'primtax']
 
+#test
 
 def concat_files_by_variable(variable, yearrange=range(2007, 2020)):
     """
