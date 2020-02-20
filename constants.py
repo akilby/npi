@@ -1,15 +1,46 @@
-RAW_DATA_PATH = '/work/akilby/npi/raw'
+NBER_PATH = 'https://data.nber.org/npi/byvar'
+RAW_DATA_DIR = '/work/akilby/npi/raw'
 
-USE_VAR_LIST = ['taxcode', 'locline1', 'locline2',
-                'loccityname', 'locstatename', 'loczip',
-                'orgname', 'loctel', 'orgnameothcode',
-                'credential', 'credentialoth', 'fname',
-                'fnameoth', 'gender', 'lname', 'licnum',
-                'licstate', 'primtax', 'enumdate']
+DISSEM_PATHS = ['http://download.cms.gov/nppes/',
+                'https://data.nber.org/npi/%s/',
+                'https://data.nber.org/npi/backfiles/']
+
+USE_MONTH_LIST = ['Jan', 'Feb', 'March', 'April', 'May', 'June',
+                  'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
+
+USE_VAR_LIST = ['entity',
+                'pfname',
+                'pmname',
+                'plname',
+                'pfnameoth',
+                'pmnameoth',
+                'plnameoth',
+                'plnamecode',
+                'penumdate',
+                'pgender',
+                'pcredential',
+                'pcredentialoth',
+                'plocline1',
+                'plocline2',
+                'ploccityname',
+                'plocstatename',
+                'ploczip',
+                'ploctel',
+                'plicnum',
+                'PLICSTATE',
+                'porgname',
+                'porgnameoth',
+                'porgnameothcode',
+                'ptaxcode',
+                'replacement_npi',
+                'soleprop',
+                'lastupdate']
 
 # Add variable for is this NPI for an organization or a person
 
 USE_VAR_LIST_DICT = {
+    'credential': 'Provider Credential Text',
+    'credentialoth':  'Provider Other Credential Text',
     'taxcode': ['Healthcare Provider Taxonomy Code_1',
                 'Healthcare Provider Taxonomy Code_2',
                 'Healthcare Provider Taxonomy Code_3',
@@ -31,8 +62,6 @@ USE_VAR_LIST_DICT = {
     'locstatename': 'Provider Business Practice Location Address State Name',
     'loczip': 'Provider Business Practice Location Address Postal Code',
     'loctel': 'Provider Business Practice Location Address Telephone Number',
-    'credential': 'Provider Credential Text',
-    'credentialoth':  'Provider Other Credential Text',
     'fname': 'Provider First Name',
     'gender': 'Provider Gender Code',
     'lname': 'Provider Last Name (Legal Name)'
