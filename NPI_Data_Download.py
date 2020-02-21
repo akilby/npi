@@ -8,7 +8,10 @@ and variables in USE_VAR_LIST
 import calendar
 import os
 import urllib.error
+import warnings
 import zipfile
+import zlib
+from pprint import pprint
 
 import pandas as pd
 import wget
@@ -56,12 +59,8 @@ def wget_nber(year, month, variable):
     '''
     stub = os.path.join(NBER_PATH, str(year), str(month),
                         '%s%s%s' % (variable, year, month))
-    # ustub = os.path.join(NBER_PATH, str(year), str(month),
-    #                      '%s%s%s' % (variable.upper(), year, month))
     if not wget_checkfirst('%s.csv' % stub, to_dir=RAW_DATA_DIR):
         if not wget_checkfirst('%s.dta' % stub, to_dir=RAW_DATA_DIR):
-            # if not wget_checkfirst('%s.csv' % ustub, to_dir=RAW_DATA_DIR):
-            #     if not wget_checkfirst('%s.dta' % ustub, to_dir=RAW_DATA_DIR):
             return False
     return True
 
@@ -93,47 +92,29 @@ def dissem_file_potential_paths(year, month):
     return p
 
 
-def wget_data_dissemination_zips(year, month):
+def wget_data_dissemination_zips(year, month, to_dir):
     '''
     '''
     found, i = False, 0
     paths = dissem_file_potential_paths(year, month)
     while not found and i < len(paths):
-        found = wget_checkfirst(paths[i], to_dir=RAW_DATA_DIR)
+        path = paths[i]
+        found = wget_checkfirst(path, to_dir=to_dir)
         i += 1
-    return found
+    path_return = path if found else None
+    return found, path_return
 
 
-
-
-for variable in USE_MONTH_LIST:
-    for year in range(2007, 2020):
-        download_path_stub2 = 'https://data.nber.org/npi/backfiles/NPPES_Data_Dissemination_%s_%s' % (variable, year)
-        try:
-            download_path3 = '%s.zip' % download_path_stub2
-            destination_path3 = os.path.join(RAW_DATA_DIR, wget.detect_filename(download_path3))
-            if not os.path.isfile(destination_path3):
-                print('WGetting zip download_path3: %s' % download_path3)
-                wget.download(download_path3, out=RAW_DATA_DIR)
-                with zipfile.ZipFile('/work/akilby/npi/raw/NPPES_Data_Dissemination_%s_%s.zip'%(variable,year), 'r') as zip_ref:
-                    zip_ref.extractall('/work/akilby/npi/raw/')
-                    print('Unzipping File')
-            else:
-                print('File already downloaded to: %s' % destination_path3)
-        except(urllib.error.HTTPError):
-            download_fail_list.append(download_path_stub2)
-            print('Warning: data does not exist')
-
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_May_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_June_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_July_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_August_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_September_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_October_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_November_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_December_2019.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_January_2020.zip', out=RAW_DATA_DIR)
-wget.download('http://download.cms.gov/nppes/NPPES_Data_Dissemination_February_2020.zip', out=RAW_DATA_DIR)
+def unzip(path, to_dir):
+    '''
+    '''
+    print('Unzipping File %s' % path, end=' ')
+    try:
+        with zipfile.ZipFile(path, 'r') as zip_ref:
+            zip_ref.extractall(to_dir)
+            print('... Unzipped')
+    except(zlib.error):
+        warnings.warn('Unzipping %s failed' % path)
 
 
 def main():
@@ -143,10 +124,20 @@ def main():
 
     # Download single-variable files from NBER
     params = [(x, y, z) for z in USE_VAR_LIST for x, y in nppes_month_list()]
-    fail_list = {x: wget_nber(*x) for x in params}
+    result_list = {x: wget_nber(*x) for x in params}
 
     # Process failed downloads
-    results, missing_months = process_fail_list(fail_list)
+    results, missing_months = process_fail_list(result_list)
 
     # Download large data dissemination files
-    fail_list = {x: wget_data_dissemination_zips(*x) for x in missing_months}
+    result_list = {x: wget_data_dissemination_zips(*x) for x in missing_months}
+    pprint([key for key, val in result_list.items() if not val[0]])
+
+    # Unzip large data dissemination files
+    zipfiles = [os.path.join(RAW_DATA_DIR, wget.detect_filename(val[1]))
+                for key, val in result_list.items() if val[0]]
+    [unzip(z, RAW_DATA_DIR) for z in zipfiles]
+
+
+if __name__ == '__main__':
+    main()
