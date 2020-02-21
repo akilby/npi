@@ -66,6 +66,9 @@ def wget_nber(year, month, variable):
 
 def process_fail_list(download_fail_list):
     '''
+    Processes download results from NBER single column files,
+    and returns a list of months that are
+    substantially incomplete (less than 5 variables observed)
     '''
     results = (pd.DataFrame([(key[0], key[1], key[2], val)
                             for key, val in download_fail_list.items()])
@@ -129,7 +132,7 @@ def main():
     results, missing_months = process_fail_list(result_list)
 
     # Download large data dissemination files
-    result_list = {x: wget_data_dissemination_zips(*x + [RAW_DATA_DIR])
+    result_list = {x: wget_data_dissemination_zips(*list(x) + [RAW_DATA_DIR])
                    for x in missing_months}
     pprint([key for key, val in result_list.items() if not val[0]])
 
