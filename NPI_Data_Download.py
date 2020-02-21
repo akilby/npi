@@ -16,6 +16,7 @@ from pprint import pprint
 import pandas as pd
 import wget
 from constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
+from utils import ensure_dir
 
 
 def nppes_month_list():
@@ -139,7 +140,7 @@ def main():
     # Unzip large data dissemination files
     zipfiles = [os.path.join(RAW_DATA_DIR, wget.detect_filename(val[1]))
                 for key, val in result_list.items() if val[0]]
-    [unzip(z, RAW_DATA_DIR) for z in zipfiles]
+    [unzip(z, os.path.splitext(z)[0]) for z in zipfiles]
 
 
 if __name__ == '__main__':
