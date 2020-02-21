@@ -129,7 +129,8 @@ def main():
     results, missing_months = process_fail_list(result_list)
 
     # Download large data dissemination files
-    result_list = {x: wget_data_dissemination_zips(*x) for x in missing_months}
+    result_list = {x: wget_data_dissemination_zips(*x + [RAW_DATA_DIR])
+                   for x in missing_months}
     pprint([key for key, val in result_list.items() if not val[0]])
 
     # Unzip large data dissemination files
