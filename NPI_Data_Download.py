@@ -15,8 +15,7 @@ from pprint import pprint
 
 import pandas as pd
 import wget
-
-from .constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
+from constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
 
 
 def nppes_month_list():
