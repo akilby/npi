@@ -82,6 +82,8 @@ def process_fail_list(download_fail_list):
 
 def dissem_file_potential_paths(year, month):
     '''
+    generates a list of potential urls at which we might find thes
+    NPI zipped dissemination files. Sources include nber and cms.
     '''
     p = []
     ndd = 'NPPES_Data_Dissemination'
