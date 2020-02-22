@@ -172,6 +172,10 @@ def main():
               index=False)
 
 
+if __name__ == '__main__':
+    main()
+
+
 # Note: need to prepend 'p' to these variables
 
 # query_dataset = 'taxcode'
