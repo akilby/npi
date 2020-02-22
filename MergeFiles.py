@@ -168,7 +168,7 @@ def process_variable(folder, variable):
 def main():
     variable = sys.argv[1]
     df = process_variable(RAW_DATA_DIR, variable)
-    df.to_csv(os.path.join(DATA_DIR, '%s_nber_new.csv' % variable),
+    df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
               index=False)
 
 
