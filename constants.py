@@ -87,4 +87,9 @@ DTYPES = {
     'ptaxcode': 'string',
     'pprimtax': 'string',
     'ptaxgroup': 'string',
+    'plocline1': 'string',
+    'plocline2': 'string',
+    'ploccityname': 'string',
+    'plocstatename': 'string',
+    'ploczip': 'string',
 }
