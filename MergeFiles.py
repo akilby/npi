@@ -96,7 +96,7 @@ def column_details(variable, dissem_file):
     multi = True if isinstance(diss_var, list) else False
     if not dissem_file:
         collist = ['npi', 'seq', variable] if multi else ['npi', variable]
-        d_use = {}
+        d_use = {} if not variable == 'ploczip' else {'ploczip': str}
     else:
         diss_vars = diss_var if multi else [diss_var]
         collist = (['NPI'] + diss_var if multi else ['NPI'] + [diss_var])
