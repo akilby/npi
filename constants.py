@@ -92,4 +92,6 @@ DTYPES = {
     'ploccityname': 'string',
     'plocstatename': 'string',
     'ploczip': 'string',
+    'pcredential': 'string',
+    'pcredentialoth': 'string',
 }
