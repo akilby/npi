@@ -50,8 +50,9 @@ class HTMLTableParser:
                     column_names.append(th.get_text())
 
         # Safeguard on Column Titles
-        if len(column_names) > 0 and len(column_names) != n_columns:
-            raise Exception("Column titles do not match the number of columns")
+        # if len(column_names) > 0 and len(column_names) != n_columns:
+        #     raise Exception("Column titles do not match"
+        #                     "the number of columns")
 
         columns = (column_names if len(column_names) > 0
                    else range(0, n_columns))
