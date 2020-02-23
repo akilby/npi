@@ -90,15 +90,16 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
         save_file_path = '%snpino_%s.txt' % (save_path, npi)
         if os.path.exists(save_file_path):
             table = hp.parse_url(save_file_path)
-            print('read from disk')
+            print('NPI %s: read from disk' % npi)
         else:
             table = hp.parse_url('https://npino.com/npi/%s' % npi,
                                  save_path=save_file_path)
+            print('NPI %s: downloaded' % npi)
         if table:
             df = npi_data_scraped(npi, table)
             df_long.append(df)
         else:
-            print('warning: npi %s not found' % npi)
+            print('NPI %s: not found' % npi)
             not_found.append(npi)
     return df_long, not_found
 
