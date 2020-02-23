@@ -88,7 +88,7 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
     hp = HTMLTableParser()
     for npi in npi_list:
         save_file_path = '%snpino_%s.txt' % (save_path, npi)
-        save_file_path2 = '%snpiprofile_%s.txt' % npi
+        save_file_path2 = '%snpiprofile_%s.txt' % (save_path, npi)
         if (not os.path.exists(save_file_path)
                 or not os.path.exists(save_file_path2)):
             time.sleep(random.uniform(.5, 2))
