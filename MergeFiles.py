@@ -157,6 +157,8 @@ def process_variable(folder, variable):
     '''
     '''
     searchlist = nppes_month_list()
+    # Should delete NPPES_Data_Dissemination_March_2011 because it's weird
+    # searchlist = [x for x in searchlist if x != (2011, 3)]
     df_list = []
     for (year, month) in searchlist:
         print(year, month)
