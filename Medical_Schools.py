@@ -8,7 +8,7 @@ class HTMLTableParser:
     def parse_url(self, url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
-        return [(table['id'], self.parse_html_table(table))
+        return [self.parse_html_table(table)
                 for table in soup.find_all('table')]
 
     def parse_html_table(self, table):
