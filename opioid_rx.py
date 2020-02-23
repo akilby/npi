@@ -24,7 +24,7 @@ def medicare_opioid_paths(yearlist=range(2013, 2018), src=RAW_DIR):
         for year in yearlist:
             m = [file for file in files if str(year) in file]
             assert len(m) == 1
-            file_dict[year] = m[0]
+            file_dict[year] = os.path.join(src, m[0])
     return file_dict
 
 
