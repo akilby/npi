@@ -53,12 +53,11 @@ class HTMLTableParser:
                 row_marker += 1
 
         # Convert to float if possible
-        for col in df:
-            try:
-                df[col] = df[col].astype(float)
-            except ValueError:
-                pass
-
+        # for col in df:
+        #     try:
+        #         df[col] = df[col].astype(float)
+        #     except ValueError:
+        #         pass
         return df
 
 # def return_npi_info(npi):
