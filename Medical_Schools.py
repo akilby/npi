@@ -70,14 +70,15 @@ class HTMLTableParser:
         return df
 
 
-def npi_data_scraped(npi, table):
+def npi_data_scraped(npi, table, src):
     medical_school = table[0][table[0][0] == "Medical School Name"][1].values
     grad_year = table[0][table[0][0] == "Graduation Year"][1].values
     medical_school = medical_school if medical_school.size > 0 else np.nan
     grad_year = grad_year if grad_year.size > 0 else np.nan
     df = pd.DataFrame({'npi': [npi],
                        'medical_school': medical_school,
-                       'grad_year': grad_year})
+                       'grad_year': grad_year,
+                       'source': src})
     return df
 
 
@@ -86,22 +87,31 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
     not_found = []
     hp = HTMLTableParser()
     for npi in npi_list:
-        time.sleep(random.uniform(.5, 2))
         save_file_path = '%snpino_%s.txt' % (save_path, npi)
+        save_file_path2 = '%snpiprofile_%s.txt' % npi
+        if (not os.path.exists(save_file_path)
+                or not os.path.exists(save_file_path2)):
+            time.sleep(random.uniform(.5, 2))
         if os.path.exists(save_file_path):
             table = hp.parse_url(save_file_path)
-            print('NPI %s: read from disk' % npi)
         else:
             table = hp.parse_url('https://npino.com/npi/%s' % npi,
                                  save_path=save_file_path)
+        if os.path.exists(save_file_path2):
+            table2 = hp.parse_url(save_file_path2)
+        else:
+            table2 = hp.parse_url('https://npiprofile.com/npi/%s' % npi,
+                                  save_path=save_file_path2)
+        if table or table2:
             print('NPI %s: downloaded' % npi)
-        if table:
-            df = npi_data_scraped(npi, table)
-            df_long.append(df)
+            df1 = npi_data_scraped(npi, table, 'npino')
+            df2 = npi_data_scraped(npi, table, 'npiprofile')
+            df_long.append(df1)
+            df_long.append(df2)
         else:
             print('NPI %s: not found' % npi)
             not_found.append(npi)
-    return df_long, not_found
+    return pd.concat(df_long), not_found
 
 
 # import sys
