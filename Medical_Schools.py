@@ -5,9 +5,13 @@ from bs4 import BeautifulSoup
 
 class HTMLTableParser:
 
-    def parse_url(self, url):
+    def parse_url(self, url, save_path=None):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'lxml')
+        if save_path:
+            with open(save_path, 'w') as f:
+                f.write(response.text)
+
         return [self.parse_html_table(table)
                 for table in soup.find_all('table')]
 
@@ -59,6 +63,13 @@ class HTMLTableParser:
         #     except ValueError:
         #         pass
         return df
+
+
+# npi = 1710906169
+# hp = HTMLTableParser()
+# table = hp.parse_url('https://npino.com/npi/%s' % npi,
+#                      save_path = '/work/akilby/npi/raw_web/npino_%s' % npi)
+
 
 # def return_npi_info(npi):
 #     r = random.randint(0, 1)
