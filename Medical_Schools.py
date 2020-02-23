@@ -104,11 +104,13 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
                                   save_path=save_file_path2)
         if table or table2:
             print('NPI %s: downloaded' % npi)
+        if table:
             df1 = npi_data_scraped(npi, table, 'npino')
-            df2 = npi_data_scraped(npi, table, 'npiprofile')
             df_long.append(df1)
+        if table2:
+            df2 = npi_data_scraped(npi, table2, 'npiprofile')
             df_long.append(df2)
-        else:
+        if not table and not table2:
             print('NPI %s: not found' % npi)
             not_found.append(npi)
     return pd.concat(df_long), not_found
