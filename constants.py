@@ -66,7 +66,8 @@ USE_VAR_LIST_DICT = {
     'ploctel': 'Provider Business Practice Location Address Telephone Number',
     'pfname': 'Provider First Name',
     'pgender': 'Provider Gender Code',
-    'plname': 'Provider Last Name (Legal Name)'
+    'plname': 'Provider Last Name (Legal Name)',
+    'penumdate': 'Provider Enumeration Date'
 }
 
 l1 = {val: key for key, val in USE_VAR_LIST_DICT.items()
@@ -94,4 +95,5 @@ DTYPES = {
     'ploczip': 'string',
     'pcredential': 'string',
     'pcredentialoth': 'string',
+    'penumdate': 'datetime64[ns]'
 }
