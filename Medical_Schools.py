@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -5,9 +6,15 @@ from bs4 import BeautifulSoup
 
 class HTMLTableParser:
 
-    def parse_url(self, url, save_path=None):
-        response = requests.get(url)
-        soup = BeautifulSoup(response.text, 'lxml')
+    def parse_url(self, read_path, save_path=None):
+        if read_path.startswith('http'):
+            response = requests.get(read_path)
+            soup = BeautifulSoup(response.text, 'lxml')
+        else:
+            with open(read_path, 'r') as f:
+                text = f.read()
+                soup = BeautifulSoup(text, 'lxml')
+
         if save_path:
             with open(save_path, 'w') as f:
                 f.write(response.text)
@@ -56,19 +63,29 @@ class HTMLTableParser:
             if len(columns) > 0:
                 row_marker += 1
 
-        # Convert to float if possible
-        # for col in df:
-        #     try:
-        #         df[col] = df[col].astype(float)
-        #     except ValueError:
-        #         pass
         return df
 
 
+# import sys
+# sys.path.append('/home/akilby/Packages/npi/')
+# from Medical_Schools import HTMLTableParser
+
 # npi = 1710906169
+
 # hp = HTMLTableParser()
 # table = hp.parse_url('https://npino.com/npi/%s' % npi,
-#                      save_path = '/work/akilby/npi/raw_web/npino_%s' % npi)
+#                      save_path='/work/akilby/npi/raw_web/npino_%s.txt' % npi)
+# 
+# 
+# def npi_data_scraped(npi, table):
+#     medical_school = table[0][table[0][0] == "Medical School Name"][1].values
+#     grad_year = table[0][table[0][0] == "Graduation Year"][1].values
+#     medical_school = medical_school if medical_school.size > 0 else np.nan
+#     grad_year = grad_year if grad_year.size > 0 else np.nan
+#     df = pd.DataFrame({'npi': [npi],
+#                        'medical_school': medical_school,
+#                        'grad_year': grad_year})
+#     return df
 
 
 # def return_npi_info(npi):
