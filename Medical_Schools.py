@@ -1,3 +1,7 @@
+import os
+import random
+import time
+
 import numpy as np
 import pandas as pd
 import requests
@@ -66,6 +70,39 @@ class HTMLTableParser:
         return df
 
 
+def npi_data_scraped(npi, table):
+    medical_school = table[0][table[0][0] == "Medical School Name"][1].values
+    grad_year = table[0][table[0][0] == "Graduation Year"][1].values
+    medical_school = medical_school if medical_school.size > 0 else np.nan
+    grad_year = grad_year if grad_year.size > 0 else np.nan
+    df = pd.DataFrame({'npi': [npi],
+                       'medical_school': medical_school,
+                       'grad_year': grad_year})
+    return df
+
+
+def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
+    df_long = []
+    not_found = []
+    hp = HTMLTableParser()
+    for npi in npi_list:
+        time.sleep(random.uniform(.5, 2))
+        save_file_path = '%snpino_%s.txt' % (save_path, npi)
+        if os.path.exists(save_file_path):
+            table = hp.parse_url(save_file_path)
+            print('read from disk')
+        else:
+            table = hp.parse_url('https://npino.com/npi/%s' % npi,
+                                 save_path=save_file_path)
+        if table:
+            df = npi_data_scraped(npi, table)
+            df_long.append(df)
+        else:
+            print('warning: npi %s not found' % npi)
+            not_found.append(npi)
+    return df_long, not_found
+
+
 # import sys
 # sys.path.append('/home/akilby/Packages/npi/')
 # from Medical_Schools import HTMLTableParser
@@ -77,15 +114,7 @@ class HTMLTableParser:
 #                      save_path='/work/akilby/npi/raw_web/npino_%s.txt' % npi)
 # 
 # 
-# def npi_data_scraped(npi, table):
-#     medical_school = table[0][table[0][0] == "Medical School Name"][1].values
-#     grad_year = table[0][table[0][0] == "Graduation Year"][1].values
-#     medical_school = medical_school if medical_school.size > 0 else np.nan
-#     grad_year = grad_year if grad_year.size > 0 else np.nan
-#     df = pd.DataFrame({'npi': [npi],
-#                        'medical_school': medical_school,
-#                        'grad_year': grad_year})
-#     return df
+
 
 
 # def return_npi_info(npi):
