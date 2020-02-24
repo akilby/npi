@@ -83,7 +83,8 @@ def npi_data_scraped(npi, table, src):
     return df
 
 
-def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
+def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
+                  quietly=False):
     df_long = []
     not_found = []
     hp = HTMLTableParser()
@@ -104,7 +105,8 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/'):
             table2 = hp.parse_url('https://npiprofile.com/npi/%s' % npi,
                                   save_path=save_file_path2)
         if table or table2:
-            print('NPI %s: downloaded' % npi)
+            if not quietly:
+                print('NPI %s: downloaded' % npi)
         if table:
             df1 = npi_data_scraped(npi, table, 'npino')
             df_long.append(df1)
