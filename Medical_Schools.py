@@ -85,10 +85,12 @@ def npi_data_scraped(npi, table, src):
 
 def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
                   quietly=False):
+    i = 0
     df_long = []
     not_found = []
     hp = HTMLTableParser()
     for npi in npi_list:
+        i += 1
         save_file_path = '%snpino_%s.txt' % (save_path, npi)
         save_file_path2 = '%snpiprofile_%s.txt' % (save_path, npi)
         if (not os.path.exists(save_file_path)
@@ -107,6 +109,9 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
         if table or table2:
             if not quietly:
                 print('NPI %s: downloaded' % npi)
+            else:
+                if round(i, -3) == i:
+                    print(i)
         if table:
             df1 = npi_data_scraped(npi, table, 'npino')
             df_long.append(df1)
