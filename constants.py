@@ -95,5 +95,16 @@ DTYPES = {
     'ploczip': 'string',
     'pcredential': 'string',
     'pcredentialoth': 'string',
-    'penumdate': 'datetime64[ns]'
+    'penumdate': 'datetime64[ns]',
+    'pfname': 'string',
+    'plname': 'string',
+    'pgender': 'string',
+    'porgname': 'string',
+    'ploctel': 'int',
+    'pfnameoth': 'string',
+    'plnameoth': 'string',
+    'plicnum': 'string',
+    'plicstate': 'string',
+    'replacement_npi': 'int',
+    'soleprop': 'string'
 }
