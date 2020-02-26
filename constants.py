@@ -9,38 +9,6 @@ DISSEM_PATHS = ['http://download.cms.gov/nppes/',
 USE_MONTH_LIST = ['Jan', 'Feb', 'March', 'April', 'May', 'June',
                   'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
 
-USE_VAR_LIST = ['entity',
-                'pfname',
-                'pmname',
-                'plname',
-                'pfnameoth',
-                'pmnameoth',
-                'plnameoth',
-                'plnamecode',
-                'penumdate',
-                'pgender',
-                'pcredential',
-                'pcredentialoth',
-                'plocline1',
-                'plocline2',
-                'ploccityname',
-                'plocstatename',
-                'ploczip',
-                'ploctel',
-                'PLICNUM',
-                'PLICSTATE',
-                'porgname',
-                'porgnameoth',
-                'porgnameothcode',
-                'ptaxcode',
-                'replacement_npi',
-                'soleprop',
-                'lastupdate',
-                'OTHPID',
-                'OTHPIDISS',
-                'OTHPIDST',
-                'OTHPIDTY']
-
 
 USE_VAR_LIST_DICT = {
     'npi': 'NPI',
@@ -386,3 +354,7 @@ DTYPES = {
     'OTHPIDST': 'string',
     'OTHPIDTY': 'int'
 }
+
+USE_VAR_LIST = [x for x in
+                list(set(list(USE_VAR_LIST_DICT.keys()) + list(DTYPES.keys())))
+                if (x in USE_VAR_LIST_DICT.keys() and x in DTYPES.keys())]
