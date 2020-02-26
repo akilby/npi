@@ -357,4 +357,6 @@ DTYPES = {
 
 USE_VAR_LIST = [x for x in
                 list(set(list(USE_VAR_LIST_DICT.keys()) + list(DTYPES.keys())))
-                if (x in USE_VAR_LIST_DICT.keys() and x in DTYPES.keys())]
+                if (x in USE_VAR_LIST_DICT.keys()
+                    and x in DTYPES.keys()
+                    and x != 'npi')]
