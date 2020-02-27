@@ -94,8 +94,15 @@ def column_details(variable, dissem_file):
     '''
     diss_var = USE_VAR_LIST_DICT[variable]
     multi = True if isinstance(diss_var, list) else False
+    tvar = ['npi', 'seq']
     if not dissem_file:
-        collist = ['npi', 'seq', variable] if multi else ['npi', variable]
+        if multi:
+            if str.isupper(variable):
+                def collist(col): return col.upper() == variable or col in tvar
+            else:
+                collist = tvar + [variable]
+        else:
+            collist = ['npi', variable]
         d_use = {} if not variable == 'ploczip' else {'ploczip': str}
     else:
         diss_vars = diss_var if multi else [diss_var]
