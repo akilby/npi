@@ -312,8 +312,13 @@ USE_VAR_LIST_DICT = {
 
 l1 = {val: key for key, val in USE_VAR_LIST_DICT.items()
       if not isinstance(val, list)}
-l2 = {x: 'ptaxcode' for x in [val for key, val in USE_VAR_LIST_DICT.items()
-      if isinstance(val, list)][0]}
+# l2 = {x: 'ptaxcode' for x in [val for key, val in USE_VAR_LIST_DICT.items()
+#       if isinstance(val, list)][0]}
+
+li = [(val, key) for key, val in USE_VAR_LIST_DICT.items()
+      if isinstance(val, list)]
+list_of_dicts = [{key: val for key in lis} for lis, val in li]
+l2 = {k: v for d in list_of_dicts for k, v in d.items()}
 
 USE_VAR_LIST_DICT_REVERSE = {**l1, **l2}
 
