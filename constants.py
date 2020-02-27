@@ -357,7 +357,7 @@ DTYPES = {
     'OTHPID': 'string',
     'OTHPIDISS': 'string',
     'OTHPIDST': 'string',
-    'OTHPIDTY': 'int'
+    'OTHPIDTY': "Int64"
 }
 
 USE_VAR_LIST = [x for x in
