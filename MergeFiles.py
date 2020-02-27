@@ -138,6 +138,10 @@ def read_and_process_df(folder, year, month, variable):
         df = (pd.read_csv(file_path, usecols=collist, dtype=d_use)
               if file_path.endswith('.csv')
               else pd.read_stata(file_path, columns=collist))
+        if (not is_dissem_file
+                and variable not in df.columns
+                and variable.lower() in df.columns):
+            df = df.rename(columns={variable.lower(): variable})
         df = convert_dtypes(df)
         df = reformat(df, variable, is_dissem_file)
         df['month'] = pd.to_datetime('%s-%s' % (year, month))
