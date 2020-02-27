@@ -352,7 +352,7 @@ DTYPES = {
     'plnameoth': 'string',
     'PLICNUM': 'string',
     'PLICSTATE': 'string',
-    'replacement_npi': 'int',
+    'replacement_npi': 'Int64',
     'soleprop': 'string',
     'OTHPID': 'string',
     'OTHPIDISS': 'string',
