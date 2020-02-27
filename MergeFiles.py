@@ -80,9 +80,16 @@ def convert_dtypes(df):
                        else DTYPES[USE_VAR_LIST_DICT_REVERSE[col]])
         if (current_dtypes[col] != final_dtype and
                 final_dtype not in current_dtypes[col]):
-            df = df.assign(**{col: coerce_dtypes(df[col],
-                                                 current_dtypes[col],
-                                                 final_dtype)})
+            try:
+                df = df.assign(**{col: coerce_dtypes(df[col],
+                                                     current_dtypes[col],
+                                                     final_dtype)})
+            except ValueError as err:
+                if final_dtype == 'string':
+                    newcol = coerce_dtypes(df[col], current_dtypes[col], 'str')
+                    newcol = coerce_dtypes(newcol, 'str', 'string')
+                else:
+                    raise ValueError("{0}".format(err))
     return df
 
 
