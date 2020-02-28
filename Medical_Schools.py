@@ -144,16 +144,16 @@ def update_db(raw_folder, med_school_partials_folder):
         df, how='left', indicator=True).query('_merge=="left_only"')
     print('new NPIs', len(new_npis.npi))
     df_long, not_found = retrieve_npis(new_npis.npi)
-    df_long['medical_school_upper'] = df_long.medical_school.str.upper()
-    m = max([int(os.path.basename(x)
-                   .split('.csv')[0]
-                   .replace('medical_schools_partial', ''))
-             for x in glob.glob(gpath)]) + 1
-    savepath = os.path.join(med_school_partials_folder,
-                            'medical_schools_partial%s.csv' % m)
-    (df_long[['npi', 'medical_school_upper', 'grad_year']].drop_duplicates()
-                                                          .sort_values('npi')
-                                                          .to_csv(savepath))
+    if not df_long.empty:
+        df_long['medical_school_upper'] = df_long.medical_school.str.upper()
+        m = max([int(os.path.basename(x)
+                       .split('.csv')[0]
+                       .replace('medical_schools_partial', ''))
+                 for x in glob.glob(gpath)]) + 1
+        savepath = os.path.join(med_school_partials_folder,
+                                'medical_schools_partial%s.csv' % m)
+        cols = ['npi', 'medical_school_upper', 'grad_year']
+        (df_long[cols].drop_duplicates().sort_values('npi').to_csv(savepath))
     df_list = []
     for pat in glob.glob(gpath):
         df_list.append(pd.read_csv(pat))
