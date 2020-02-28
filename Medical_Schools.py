@@ -125,7 +125,7 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
 
 def update_db(raw_folder, med_school_partials_folder):
     '''
-    pulls updates from the raw data folder and saves to a
+    Pulls updates from the raw data folder and saves to a
     med school partial file. then concatenates all partial
     files to return one long database
     '''
@@ -159,20 +159,3 @@ def update_db(raw_folder, med_school_partials_folder):
         df_list.append(pd.read_csv(pat))
 
     return pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
-
-
-# hp = HTMLTableParser()
-# table = hp.parse_url('https://npino.com/npi/%s' % npi,
-#                      save_path='/work/akilby/npi/raw_web/npino_%s.txt' % npi)
-# 
-# 
-
-
-
-# def return_npi_info(npi):
-#     r = random.randint(0, 1)
-#     if r == 0:
-#         out = (requests.get('https://npino.com/npi/%s' % npi)
-#                        .text.split('Specialization')[1].split('Gender')[0])
-#     else:
-#         out = requests.get('https://npiprofile.com/npi/%s' % npi).text.split('<td>Gender</td><td>')[1].split('<td>Is Sole Proprietor?</td><td>')[0]
