@@ -12,13 +12,31 @@ def likely_md_do():
         'prefix=="207" or prefix=="208" or ptaxcode=="390200000X"')
     md_do_student = md_do_student[['npi', 'month']].drop_duplicates()
 
-    md_do_student2 = df_tax.merge(pd.DataFrame({'ptaxcode', other_md_codes}))
+    md_do_student2 = df_tax.merge(pd.DataFrame({'ptaxcode': other_md_codes}))
+    md_do_student2 = md_do_student2[['npi', 'month']].drop_duplicates()
+
+    md_do_student = md_do_student.append(md_do_student2)
     
     # only want individuals
     df_entity = pd.read_csv('/work/akilby/npi/data/entity.csv')
     md_do_student = md_do_student.merge(df_entity, how='left')
+    md_do_student = md_do_student.query("entity==1")
 
+    # Look in credentials
     df_pcredential = pd.read_csv('/work/akilby/npi/data/pcredential.csv')
+    df_pcredential['stripped'] = (df_pcredential.pcredential
+                                                .str.replace('.', '')
+                                                .str.replace(' ', '')
+                                                .str.strip())
+    md_do = df_pcredential.query('stripped=="MD" or stripped=="DO"')
+    md_do = md_do.merge(df_entity, how='left')
+    md_do = md_do.query("entity==1")
+    
+    df_pcredential['stripped'] = (df_pcredential.pcredential
+                                                .str.replace('.', '')
+                                                .str.replace(' ', '')
+                                                .str.strip())
+
     df_pcredentialoth = pd.read_csv('/work/akilby/npi/data/pcredentialoth.csv')
 
 
@@ -32,6 +50,9 @@ def medicaid_providers(state=None):
     df = df1.merge(df2, how='left').merge(df3, how='left')
     df[['npi', 'month', 'seq']].drop_duplicates()
 
-    state_medicaid = df_all2.query('OTHPIDTY==5 and OTHPIDST=="IL"')
+    if state:
+        medicaid = df.query('OTHPIDTY==5 and OTHPIDST=="IL"')
+    else:
+        medicaid = df.query('OTHPIDTY==5')
     df_entity = pd.read_csv('/work/akilby/npi/data/entity.csv')
-    state_medicaid = state_medicaid.merge(df_entity, how='left')
+    medicaid = medicaid.merge(df_entity, how='left')

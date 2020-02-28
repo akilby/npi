@@ -93,7 +93,7 @@ def convert_dtypes(df):
     return df
 
 
-def column_details(variable, dissem_file):
+def column_details(variable, dissem_file, dta_file):
     '''
     Generates column list to get from the raw data; dissem files
     have long string names and are wide, whereas NBER files have
@@ -104,8 +104,10 @@ def column_details(variable, dissem_file):
     tvar = ['npi', 'seq']
     if not dissem_file:
         if multi:
-            if str.isupper(variable):
+            if str.isupper(variable) and not dta_file:
                 def collist(col): return col.upper() == variable or col in tvar
+            elif str.isupper(variable) and dta_file:
+                collist = tvar + [variable.lower()]
             else:
                 collist = tvar + [variable]
         else:
@@ -141,7 +143,8 @@ def read_and_process_df(folder, year, month, variable):
     file_path = locate_file(folder, '%s' % year, '%s' % month, variable)
     if file_path:
         is_dissem_file = len(file_path.split('/')) > 6
-        collist, d_use = column_details(variable, is_dissem_file)
+        is_dta_file = os.path.splitext(file_path)[1] == '.dta'
+        collist, d_use = column_details(variable, is_dissem_file, is_dta_file)
         df = (pd.read_csv(file_path, usecols=collist, dtype=d_use)
               if file_path.endswith('.csv')
               else pd.read_stata(file_path, columns=collist))
