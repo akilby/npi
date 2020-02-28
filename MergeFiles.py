@@ -180,13 +180,13 @@ def process_variable(folder, variable):
     df_list = []
     for (year, month) in searchlist:
         print(year, month)
-        try:
-            df = read_and_process_df(folder, year, month, variable)
-        except ValueError as err:
-            if variable == "PTAXGROUP":
+        if variable == "PTAXGROUP":
+            try:
+                df = read_and_process_df(folder, year, month, variable)
+            except ValueError as err:
                 assert year < 2012
-            else:
-                raise ValueError("{0}".format(err))
+        else:
+            df = read_and_process_df(folder, year, month, variable)
         df_list.append(df)
     return pd.concat(df_list, axis=0)
 
