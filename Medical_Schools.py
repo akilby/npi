@@ -1,3 +1,4 @@
+import glob
 import os
 import random
 import time
@@ -48,11 +49,6 @@ class HTMLTableParser:
             if len(th_tags) > 0 and len(column_names) == 0:
                 for th in th_tags:
                     column_names.append(th.get_text())
-
-        # Safeguard on Column Titles
-        # if len(column_names) > 0 and len(column_names) != n_columns:
-        #     raise Exception("Column titles do not match"
-        #                     "the number of columns")
 
         columns = (column_names if len(column_names) > 0
                    else range(0, n_columns))
@@ -121,14 +117,49 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
         if not table and not table2:
             print('NPI %s: not found' % npi)
             not_found.append(npi)
-    return pd.concat(df_long), not_found
+    if df_long:
+        return pd.concat(df_long), not_found
+    else:
+        return pd.DataFrame(), not_found
 
 
-# import sys
-# sys.path.append('/home/akilby/Packages/npi/')
-# from Medical_Schools import HTMLTableParser
+def update_db(raw_folder, med_school_partials_folder):
+    '''
+    pulls updates from the raw data folder and saves to a
+    med school partial file. then concatenates all partial
+    files to return one long database
+    '''
+    gpath = os.path.join(med_school_partials_folder,
+                         'medical_schools_partial*.csv')
+    df_list = []
+    for pat in glob.glob(gpath):
+        df_list.append(pd.read_csv(pat))
 
-# npi = 1710906169
+    df = pd.concat(df_list).drop(columns=['Unnamed: 0']).npi.drop_duplicates()
+    fi = sorted(list(set([os.path.basename(x).split('.txt')[0]
+                          for x
+                          in glob.glob(os.path.join(raw_folder, '*.txt'))])))
+    fi = [x.split('_')[1] for x in fi]
+    new_npis = pd.DataFrame(dict(npi=fi)).astype(int).merge(
+        df, how='left', indicator=True).query('_merge=="left_only"')
+    print('new NPIs', len(new_npis.npi))
+    df_long, not_found = retrieve_npis(new_npis.npi)
+    df_long['medical_school_upper'] = df_long.medical_school.str.upper()
+    m = max([int(os.path.basename(x)
+                   .split('.csv')[0]
+                   .replace('medical_schools_partial', ''))
+             for x in glob.glob(gpath)]) + 1
+    savepath = os.path.join(med_school_partials_folder,
+                            'medical_schools_partial%s.csv' % m)
+    (df_long[['npi', 'medical_school_upper', 'grad_year']].drop_duplicates()
+                                                          .sort_values('npi')
+                                                          .to_csv(savepath))
+    df_list = []
+    for pat in glob.glob(gpath):
+        df_list.append(pd.read_csv(pat))
+
+    return pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
+
 
 # hp = HTMLTableParser()
 # table = hp.parse_url('https://npino.com/npi/%s' % npi,
