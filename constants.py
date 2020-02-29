@@ -340,7 +340,7 @@ DTYPES = {
     'ploczip': 'string',
     'pcredential': 'string',
     'pcredentialoth': 'string',
-    'porgnameothcode': 'int',
+    'porgnameothcode': 'Int64',
     'porgnameoth': 'string',
     'penumdate': 'datetime64[ns]',
     'pfname': 'string',
