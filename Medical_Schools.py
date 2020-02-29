@@ -157,5 +157,5 @@ def update_db(raw_folder, med_school_partials_folder):
     df_list = []
     for pat in glob.glob(gpath):
         df_list.append(pd.read_csv(pat))
-
-    return pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
+    updated = pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
+    return updated, not_found
