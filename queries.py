@@ -102,7 +102,7 @@ def medicaid_providers(state=None,
     dfl = df_lics.merge(df_lic, how='outer')
 
     df_tax = pd.DataFrame()
-    dfr = pd.read_csv('/work/akilby/npi/data/%s.csv' % 'PLICSTATE', iterator=True,
+    dfr = pd.read_csv('/work/akilby/npi/data/%s.csv' % 'ptaxcode', iterator=True,
                       chunksize=1000000)
     for dfrs in dfr:
         df_tax = df_tax.append(dfrs[dfrs.npi.isin(medicaid_npis)])
