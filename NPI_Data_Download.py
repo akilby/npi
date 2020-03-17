@@ -1,9 +1,9 @@
-'''
+"""
 Code written collaboratively with @amin.p and @akilby
 
 Downloads all NBER npi data for years in yearlist and months in monthslist
 and variables in USE_VAR_LIST
-'''
+"""
 
 import calendar
 import os
@@ -19,9 +19,9 @@ from constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
 
 
 def nppes_month_list():
-    '''
+    """
     NPI/NPPES data is available from Nov 2007 to present
-    '''
+    """
     cyear = pd.to_datetime('today').year
     cmonth = pd.to_datetime('today').month
     return [(x, y) for x in range(2007, cyear + 1)
@@ -31,12 +31,12 @@ def nppes_month_list():
 
 
 def wget_checkfirst(url, to_dir, nondestructive=True):
-    '''
+    """
     Wgets a download path to to_dir, checking first
     if that filename exists in that path
 
     Does not overwrite unless nondestructive=False
-    '''
+    """
     filename = wget.detect_filename(url)
     destination_path = os.path.join(to_dir, filename)
     if os.path.isfile(destination_path) and nondestructive:
@@ -52,10 +52,10 @@ def wget_checkfirst(url, to_dir, nondestructive=True):
 
 
 def wget_nber(year, month, variable):
-    '''
+    """
     Downloads a year, month, variable single-variable file
     from NBER NPPES host
-    '''
+    """
     stub = os.path.join(NBER_PATH, str(year), str(month),
                         '%s%s%s' % (variable, year, month))
     if not wget_checkfirst('%s.csv' % stub, to_dir=RAW_DATA_DIR):
@@ -65,11 +65,11 @@ def wget_nber(year, month, variable):
 
 
 def process_fail_list(download_fail_list):
-    '''
+    """
     Processes download results from NBER single column files,
     and returns a list of months that are
     substantially incomplete (less than 5 variables observed)
-    '''
+    """
     results = (pd.DataFrame([(key[0], key[1], key[2], val)
                             for key, val in download_fail_list.items()])
                .set_index([0, 1, 2])
@@ -81,10 +81,10 @@ def process_fail_list(download_fail_list):
 
 
 def dissem_file_potential_paths(year, month):
-    '''
+    """
     generates a list of potential urls at which we might find thes
     NPI zipped dissemination files. Sources include nber and cms.
-    '''
+    """
     p = []
     ndd = 'NPPES_Data_Dissemination'
     mname = calendar.month_name[month]
@@ -97,8 +97,8 @@ def dissem_file_potential_paths(year, month):
 
 
 def wget_data_dissemination_zips(year, month, to_dir):
-    '''
-    '''
+    """
+    """
     found, i = False, 0
     paths = dissem_file_potential_paths(year, month)
     while not found and i < len(paths):
@@ -110,8 +110,8 @@ def wget_data_dissemination_zips(year, month, to_dir):
 
 
 def unzip(path, to_dir):
-    '''
-    '''
+    """
+    """
     print('Unzipping File %s' % path, end=' ')
     try:
         with zipfile.ZipFile(path, 'r') as zip_ref:
