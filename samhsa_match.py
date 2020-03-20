@@ -11,6 +11,7 @@ src = '/work/akilby/npi/data/'
 class NPI(object):
     def __init__(self, src):
         self.src = src
+        self.get_entity()
 
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
@@ -22,7 +23,20 @@ class NPI(object):
         fname = pd.read_csv(os.path.join(src, 'pfname.csv'))
         fname['pfname'] = fname['pfname'].str.upper()
         fname = fname[['npi', 'pfname']].drop_duplicates()
+        fname = (fname.merge(self.entity.query('entity==1'))
+                      .drop(columns=['entity']))
+        fname = purge_nulls(fname, 'pfname', ['npi'])
         self.fname = fname
+
+    def get_fnameoth(self):
+        if hasattr(self, 'fnameoth'):
+            return
+        src = self.src
+        fnameoth = pd.read_csv(os.path.join(src, 'pfnameoth.csv'))
+        fnameoth = fnameoth.dropna()
+        fnameoth['pfnameoth'] = fnameoth['pfnameoth'].str.upper()
+        fnameoth = fnameoth[['npi', 'pfnameoth']].drop_duplicates()
+        self.fnameoth = fnameoth
 
     def get_lname(self):
         if hasattr(self, 'lname'):
@@ -31,15 +45,28 @@ class NPI(object):
         lname = pd.read_csv(os.path.join(src, 'plname.csv'))
         lname['plname'] = lname['plname'].str.upper()
         lname = lname[['npi', 'plname']].drop_duplicates()
+        lname = (lname.merge(self.entity.query('entity==1'))
+                      .drop(columns=['entity']))
+        lname = purge_nulls(lname, 'plname', ['npi'])
         self.lname = lname
+
+    def get_lnameoth(self):
+        if hasattr(self, 'lnameoth'):
+            return
+        src = self.src
+        lnameoth = pd.read_csv(os.path.join(src, 'plnameoth.csv'))
+        lnameoth = lnameoth.dropna()
+        lnameoth['plnameoth'] = lnameoth['plnameoth'].str.upper()
+        lnameoth = lnameoth[['npi', 'plnameoth']].drop_duplicates()
+        self.lnameoth = lnameoth
 
     def get_locstatename(self):
         if hasattr(self, 'locstatename'):
             return
         src = self.src
         locstatename = pd.read_csv(os.path.join(src, 'plocstatename.csv'))
-        entity = pd.read_csv(os.path.join(src, 'entity.csv'))
-        locstatename = locstatename.merge(entity)
+        # entity = pd.read_csv(os.path.join(src, 'entity.csv'))
+        # locstatename = locstatename.merge(entity)
         self.locstatename = locstatename
 
     def get_fullnames(self):
@@ -49,7 +76,29 @@ class NPI(object):
         self.get_lname()
         self.fullnames = pd.merge(self.fname, self.lname, how='outer')
 
-# df = pd.merge(fname, lname, how='outer')
+    def get_entity(self):
+        if hasattr(self, 'entity'):
+            return
+        src = self.src
+        entity = pd.read_csv(os.path.join(src, 'entity.csv'))
+        entity = entity.dropna()
+        entity['entity'] = entity.entity.astype("int")
+        self.entity = entity[['npi', 'entity']].drop_duplicates()
+
+
+def purge_nulls(df, var, mergeon):
+    '''
+    For rows that are null, drop from data only if they are present elsewhere
+    '''
+    missings = df[df[var].isnull()].merge(df[~df[var].isnull()], on=mergeon)
+    missings = missings[['npi', '%s_x' % var]].rename(
+        columns={'%s_x' % var: var})
+    missings = missings.drop_duplicates()
+    df = (df.merge(missings, indicator=True, how='left')
+            .query('_merge=="left_only"')
+            .drop(columns=['_merge']))
+    return df
+
 # nonames = df[~df.npi.isin(df.dropna().npi)]
 
 # df = df.dropna()

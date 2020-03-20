@@ -136,6 +136,8 @@ def update_db(raw_folder, med_school_partials_folder):
         df_list.append(pd.read_csv(pat))
 
     df = pd.concat(df_list).drop(columns=['Unnamed: 0']).npi.drop_duplicates()
+
+    [os.remove(x) for x in glob.glob(os.path.join(raw_folder, '*npi.txt'))]
     fi = sorted(list(set([os.path.basename(x).split('.txt')[0]
                           for x
                           in glob.glob(os.path.join(raw_folder, '*.txt'))])))
