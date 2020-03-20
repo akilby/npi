@@ -74,7 +74,27 @@ class NPI(object):
             return
         self.get_fname()
         self.get_lname()
-        self.fullnames = pd.merge(self.fname, self.lname, how='outer')
+        self.get_fnameoth()
+        self.get_lnameoth()
+        fullnames = pd.merge(self.fname, self.lname, how='outer')
+        merged = (self.fnameoth.merge(self.lnameoth, how='outer')
+                               .merge(self.fname, how='left')
+                               .merge(self.lname, how='left'))
+        merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
+        merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
+        merged = merged.drop(columns=['pfname', 'plname']).drop_duplicates()
+        merged = (merged.merge(fullnames,
+                               left_on=['npi', 'pfnameoth', 'plnameoth'],
+                               right_on=['npi', 'pfname', 'plname'],
+                               how='left', indicator=True)
+                        .query('_merge=="left_only"')
+                        .drop(columns=['pfname', 'plname', '_merge']))
+        merged['othflag'] = 1
+        fullnames['othflag'] = 0
+        ren = {'plnameoth': 'plname', 'pfnameoth': 'pfname'}
+        fullnames = (fullnames.append(merged.rename(columns=ren))
+                              .sort_values(['npi', 'flag'])
+                              .reset_index(drop=True))
 
     def get_entity(self):
         if hasattr(self, 'entity'):
