@@ -202,11 +202,13 @@ def main():
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                   index=False)
     else:
+        print('Updating:')
         df = pd.read_csv(os.path.join(DATA_DIR, '%s.csv' % variable))
         last_month = max(list(df.month.value_counts().index))
         searchlist = [x for x in nppes_month_list() if
                       (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
                        > pd.to_datetime(last_month))]
+        print('months-', searchlist)
         df2 = process_variable(RAW_DATA_DIR, variable, searchlist)
         df = pd.concat([df, df2], axis=0)
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
