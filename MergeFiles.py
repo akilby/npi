@@ -174,10 +174,9 @@ def reformat(df, variable, is_dissem_file):
     return df
 
 
-def process_variable(folder, variable):
+def process_variable(folder, variable, searchlist):
     '''
     '''
-    searchlist = nppes_month_list()
     # Should delete NPPES_Data_Dissemination_March_2011 because it's weird
     # searchlist = [x for x in searchlist if x != (2011, 3)]
     df_list = []
@@ -196,9 +195,22 @@ def process_variable(folder, variable):
 
 def main():
     variable = sys.argv[1]
-    df = process_variable(RAW_DATA_DIR, variable)
-    df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
-              index=False)
+    update = sys.argv[2] if len(sys.argv) > 2 else False
+    update = True if update == 'True' else False
+    if not update:
+        df = process_variable(RAW_DATA_DIR, variable, nppes_month_list())
+        df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
+                  index=False)
+    else:
+        df = pd.read_csv(os.path.join(DATA_DIR, '%s.csv' % variable))
+        last_month = max(list(df.month.value_counts().index))
+        searchlist = [x for x in nppes_month_list() if
+                      (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
+                       > pd.to_datetime(last_month))]
+        df2 = process_variable(RAW_DATA_DIR, variable, searchlist)
+        df = pd.concat([df, df2], axis=0)
+        df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
+                  index=False)
 
 
 if __name__ == '__main__':

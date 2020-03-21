@@ -25,92 +25,6 @@ class NPI(object):
         entity['entity'] = entity.entity.astype("int")
         self.entity = entity[['npi', 'entity']].drop_duplicates()
 
-    def get_fname(self):
-        if hasattr(self, 'fname'):
-            return
-        src = self.src
-        fname = pd.read_csv(os.path.join(src, 'pfname.csv'))
-        fname['pfname'] = fname['pfname'].str.upper()
-        fname = fname[['npi', 'pfname']].drop_duplicates()
-        fname = (fname.merge(self.entity.query('entity==1'))
-                      .drop(columns=['entity']))
-        fname = purge_nulls(fname, 'pfname', ['npi'])
-        self.fname = fname
-
-    def get_mname(self):
-        if hasattr(self, 'mname'):
-            return
-        self.mname = self.get_name('mname')
-
-    def get_fnameoth(self):
-        if hasattr(self, 'fnameoth'):
-            return
-        src = self.src
-        fnameoth = pd.read_csv(os.path.join(src, 'pfnameoth.csv'))
-        fnameoth = fnameoth.dropna()
-        fnameoth['pfnameoth'] = fnameoth['pfnameoth'].str.upper()
-        fnameoth = fnameoth[['npi', 'pfnameoth']].drop_duplicates()
-        self.fnameoth = fnameoth
-
-    def get_lname(self):
-        if hasattr(self, 'lname'):
-            return
-        src = self.src
-        lname = pd.read_csv(os.path.join(src, 'plname.csv'))
-        lname['plname'] = lname['plname'].str.upper()
-        lname = lname[['npi', 'plname']].drop_duplicates()
-        lname = (lname.merge(self.entity.query('entity==1'))
-                      .drop(columns=['entity']))
-        lname = purge_nulls(lname, 'plname', ['npi'])
-        self.lname = lname
-
-    def get_lnameoth(self):
-        if hasattr(self, 'lnameoth'):
-            return
-        src = self.src
-        lnameoth = pd.read_csv(os.path.join(src, 'plnameoth.csv'))
-        lnameoth = lnameoth.dropna()
-        lnameoth['plnameoth'] = lnameoth['plnameoth'].str.upper()
-        lnameoth = lnameoth[['npi', 'plnameoth']].drop_duplicates()
-        self.lnameoth = lnameoth
-
-    def get_locstatename(self):
-        if hasattr(self, 'locstatename'):
-            return
-        src = self.src
-        locstatename = pd.read_csv(os.path.join(src, 'plocstatename.csv'))
-        # entity = pd.read_csv(os.path.join(src, 'entity.csv'))
-        # locstatename = locstatename.merge(entity)
-        self.locstatename = locstatename
-
-    def get_fullnames(self):
-        if hasattr(self, 'fullnames'):
-            return
-        self.get_fname()
-        self.get_lname()
-        self.get_fnameoth()
-        self.get_lnameoth()
-        fullnames = pd.merge(self.fname, self.lname, how='outer')
-        merged = (self.fnameoth.merge(self.lnameoth, how='outer')
-                               .merge(self.fname, how='left')
-                               .merge(self.lname, how='left'))
-        merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
-        merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
-        merged = merged.drop(columns=['pfname', 'plname']).drop_duplicates()
-        merged = (merged.merge(fullnames,
-                               left_on=['npi', 'pfnameoth', 'plnameoth'],
-                               right_on=['npi', 'pfname', 'plname'],
-                               how='left', indicator=True)
-                        .query('_merge=="left_only"')
-                        .drop(columns=['pfname', 'plname', '_merge']))
-        merged['othflag'] = 1
-        fullnames['othflag'] = 0
-        ren = {'plnameoth': 'plname', 'pfnameoth': 'pfname'}
-        fullnames = (fullnames.append(merged.rename(columns=ren))
-                              .sort_values(['npi', 'othflag'])
-                              .reset_index(drop=True))
-        self.fullnames = fullnames
-
     def get_name(self, name_stub):
         name = pd.read_csv(os.path.join(self.src, 'p%s.csv' % name_stub))
         name['p%s' % name_stub] = name['p%s' % name_stub].str.upper()
@@ -120,6 +34,101 @@ class NPI(object):
         name = purge_nulls(name, 'p%s' % name_stub, ['npi'])
         return name
 
+    def get_fname(self):
+        if hasattr(self, 'fname'):
+            return
+        self.fname = self.get_name('fname')
+
+    def get_mname(self):
+        if hasattr(self, 'mname'):
+            return
+        self.mname = self.get_name('mname')
+
+    def get_lname(self):
+        if hasattr(self, 'lname'):
+            return
+        self.lname = self.get_name('lname')
+
+    def get_nameoth(self, name_stub):
+        nameoth = pd.read_csv(os.path.join(self.src, 'p%s.csv' % name_stub))
+        nameoth = nameoth.dropna()
+        nameoth['p%s' % name_stub] = nameoth['p%s' % name_stub].str.upper()
+        nameoth = nameoth[['npi', 'p%s' % name_stub]].drop_duplicates()
+        return nameoth
+
+    def get_fnameoth(self):
+        if hasattr(self, 'fnameoth'):
+            return
+        self.fnameoth = self.get_nameoth('fnameoth')
+
+    def get_mnameoth(self):
+        if hasattr(self, 'mnameoth'):
+            return
+        self.mnameoth = self.get_nameoth('mnameoth')
+
+    def get_lnameoth(self):
+        if hasattr(self, 'lnameoth'):
+            return
+        self.lnameoth = self.get_nameoth('lnameoth')
+
+    def get_locstatename(self):
+        if hasattr(self, 'locstatename'):
+            return
+        src = self.src
+        locstatename = pd.read_csv(os.path.join(src, 'plocstatename.csv'))
+        self.locstatename = locstatename
+
+    def get_fullnames(self):
+        if hasattr(self, 'fullnames'):
+            return
+        self.get_fname()
+        self.get_mname()
+        self.get_lname()
+        self.get_fnameoth()
+        self.get_mnameoth()
+        self.get_lnameoth()
+
+        name_list = ['pfname', 'pmname', 'plname']
+        oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth']
+        ren = {'plnameoth': 'plname',
+               'pfnameoth': 'pfname',
+               'pmnameoth': 'pmname'}
+
+        fullnames = pd.merge(self.fname, self.lname, how='outer')
+        fullnames = pd.merge(fullnames, self.mname, how='outer')
+        fullnames = fullnames[['npi'] + name_list]
+        merged = (self.fnameoth.merge(self.lnameoth, how='outer')
+                               .merge(self.mnmeoth, how='outer')
+                               .merge(self.fname, how='left')
+                               .merge(self.lname, how='left')
+                               .merge(self.mname, how='left'))
+        merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
+        merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
+
+        merged2 = merged.copy()
+        merged.loc[merged.pmnameoth.isnull(), 'pmnameoth'] = merged.pmname
+
+        def remove_duplicated_names(merged):
+            merged = (merged.drop(columns=name_list)
+                            .drop_duplicates())
+            merged = (merged.merge(fullnames,
+                                   left_on=['npi'] + oth_list,
+                                   right_on=['npi'] + name_list,
+                                   how='left', indicator=True)
+                            .query('_merge=="left_only"')
+                            .drop(columns=name_list + ['_merge']))
+            return merged
+
+        merged = remove_duplicated_names(merged)
+        merged2 = remove_duplicated_names(merged2)
+
+        merged = merged.append(merged2).drop_duplicates()
+        merged['othflag'] = 1
+        fullnames['othflag'] = 0
+        fullnames = (fullnames.append(merged.rename(columns=ren))
+                              .sort_values(['npi', 'othflag'])
+                              .reset_index(drop=True))
+        self.fullnames = fullnames
 
 
 def purge_nulls(df, var, mergeon):
