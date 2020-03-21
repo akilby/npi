@@ -93,8 +93,9 @@ class NPI(object):
         fullnames['othflag'] = 0
         ren = {'plnameoth': 'plname', 'pfnameoth': 'pfname'}
         fullnames = (fullnames.append(merged.rename(columns=ren))
-                              .sort_values(['npi', 'flag'])
+                              .sort_values(['npi', 'othflag'])
                               .reset_index(drop=True))
+        self.fullnames = fullnames
 
     def get_entity(self):
         if hasattr(self, 'entity'):
