@@ -16,6 +16,15 @@ class NPI(object):
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
 
+    def get_entity(self):
+        if hasattr(self, 'entity'):
+            return
+        src = self.src
+        entity = pd.read_csv(os.path.join(src, 'entity.csv'))
+        entity = entity.dropna()
+        entity['entity'] = entity.entity.astype("int")
+        self.entity = entity[['npi', 'entity']].drop_duplicates()
+
     def get_fname(self):
         if hasattr(self, 'fname'):
             return
@@ -27,6 +36,11 @@ class NPI(object):
                       .drop(columns=['entity']))
         fname = purge_nulls(fname, 'pfname', ['npi'])
         self.fname = fname
+
+    def get_mname(self):
+        if hasattr(self, 'mname'):
+            return
+        self.mname = self.get_name('mname')
 
     def get_fnameoth(self):
         if hasattr(self, 'fnameoth'):
@@ -97,14 +111,15 @@ class NPI(object):
                               .reset_index(drop=True))
         self.fullnames = fullnames
 
-    def get_entity(self):
-        if hasattr(self, 'entity'):
-            return
-        src = self.src
-        entity = pd.read_csv(os.path.join(src, 'entity.csv'))
-        entity = entity.dropna()
-        entity['entity'] = entity.entity.astype("int")
-        self.entity = entity[['npi', 'entity']].drop_duplicates()
+    def get_name(self, name_stub):
+        name = pd.read_csv(os.path.join(self.src, 'p%s.csv' % name_stub))
+        name['p%s' % name_stub] = name['p%s' % name_stub].str.upper()
+        name = name[['npi', 'p%s' % name_stub]].drop_duplicates()
+        name = (name.merge(self.entity.query('entity==1'))
+                    .drop(columns=['entity']))
+        name = purge_nulls(name, 'p%s' % name_stub, ['npi'])
+        return name
+
 
 
 def purge_nulls(df, var, mergeon):
@@ -119,6 +134,9 @@ def purge_nulls(df, var, mergeon):
             .query('_merge=="left_only"')
             .drop(columns=['_merge']))
     return df
+
+
+
 
 # nonames = df[~df.npi.isin(df.dropna().npi)]
 
