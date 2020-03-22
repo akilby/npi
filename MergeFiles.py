@@ -196,7 +196,7 @@ def process_variable(folder, variable, searchlist):
 def main():
     variable = sys.argv[1]
     update = sys.argv[2] if len(sys.argv) > 2 else False
-    update = True if update == 'True' else False
+    update = update if (update == 'True' or update == 'Force') else False
     if not update:
         df = process_variable(RAW_DATA_DIR, variable, nppes_month_list())
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
@@ -210,7 +210,8 @@ def main():
                       (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
                        > pd.to_datetime(last_month))]
         print('months->', searchlist)
-        if searchlist != []:
+        if searchlist != [] or update == 'Force':
+            df['month'] = pd.to_datetime(df.month)
             df2 = process_variable(RAW_DATA_DIR, variable, searchlist)
             df = pd.concat([df, df2], axis=0)
             df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
