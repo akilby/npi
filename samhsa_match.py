@@ -98,7 +98,7 @@ class NPI(object):
         fullnames = pd.merge(fullnames, self.mname, how='outer')
         fullnames = fullnames[['npi'] + name_list]
         merged = (self.fnameoth.merge(self.lnameoth, how='outer')
-                               .merge(self.mnmeoth, how='outer')
+                               .merge(self.mnameoth, how='outer')
                                .merge(self.fname, how='left')
                                .merge(self.lname, how='left')
                                .merge(self.mname, how='left'))
