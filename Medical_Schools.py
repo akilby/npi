@@ -8,6 +8,9 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
+med_school_partials_folder = '/work/akilby/npi/data/medical_schools'
+raw_folder = '/work/akilby/npi/raw_web'
+
 
 class HTMLTableParser:
 
@@ -142,7 +145,7 @@ def update_db(raw_folder, med_school_partials_folder):
                           for x
                           in glob.glob(os.path.join(raw_folder, '*.txt'))])))
     fi = [x.split('_')[1] for x in fi]
-    new_npis = pd.DataFrame(dict(npi=fi)).astype(int).merge(
+    new_npis = pd.DataFrame(dict(npi=fi)).astype(int).drop_duplicates().merge(
         df, how='left', indicator=True).query('_merge=="left_only"')
     print('new NPIs', len(new_npis.npi))
     df_long, not_found = retrieve_npis(new_npis.npi)
