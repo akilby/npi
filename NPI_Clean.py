@@ -140,10 +140,10 @@ class NPI(object):
                    .TaxonomyCode
                    .tolist())
         student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
-        taxcode.loc[taxcode.ptaxcode.isin(pa), 'cat'] = 'pa'
-        taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'np'
-        taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'mddo'
-        taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'student'
+        taxcode.loc[taxcode.ptaxcode.isin(pa), 'cat'] = 'PA'
+        taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'NP'
+        taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
+        taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
         taxcode = (taxcode.merge(self.entity.query('entity==1'))
                           .drop(columns=['entity']))
         self.taxcode = taxcode

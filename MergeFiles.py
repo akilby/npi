@@ -31,6 +31,17 @@ def get_filepaths_from_dissemination_zips(folder):
     return paths
 
 
+def get_secondary_loc_filepaths_from_dissemination_zips(folder):
+    zip_paths = os.path.join(folder, 'NPPES_Data_Dissemination*')
+    stub = os.path.join(folder, 'NPPES_Data_Dissemination_')
+    possbl = list(set(glob.glob(zip_paths + '/**/pl_pfile_*', recursive=True)))
+    paths = {(x.partition(stub)[2].split('/')[0].split('_')[1],
+              str(month_name_to_month_num(
+               x.partition(stub)[2].split('/')[0].split('_')[0]))): x
+             for x in possbl if 'eader' not in x}
+    return paths
+
+
 def get_filepaths_from_single_variable_files(variable, folder, noisily=True):
     '''
     Returns a dictionary of the path to each single variable file, for
@@ -125,6 +136,7 @@ def locate_file(folder, year, month, variable):
     '''
     paths1 = get_filepaths_from_single_variable_files(variable, folder, False)
     paths2 = get_filepaths_from_dissemination_zips(folder)
+    paths3 = get_secondary_loc_filepaths_from_dissemination_zips(folder)
     try:
         return paths1[(year, month)]
     except KeyError:

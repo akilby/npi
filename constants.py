@@ -66,6 +66,17 @@ USE_VAR_LIST_DICT = {
     'plocstatename': 'Provider Business Practice Location Address State Name',
     'ploczip': 'Provider Business Practice Location Address Postal Code',
     'ploctel': 'Provider Business Practice Location Address Telephone Number',
+    'ploc2line1':
+        'Provider Secondary Practice Location Address- Address Line 1',
+    'ploc2line2':
+        'Provider Secondary Practice Location Address-  Address Line 2',
+    'ploc2cityname':
+        'Provider Secondary Practice Location Address - City Name',
+    'ploc2statename':
+        'Provider Secondary Practice Location Address - State Name',
+    'ploc2zip': 'Provider Secondary Practice Location Address - Postal Code',
+    'ploc2tel':
+        'Provider Secondary Practice Location Address - Telephone Number',
     'pfname': 'Provider First Name',
     'pmname': 'Provider Middle Name',
     'pgender': 'Provider Gender Code',
@@ -340,6 +351,12 @@ DTYPES = {
     'ploccityname': 'string',
     'plocstatename': 'string',
     'ploczip': 'string',
+    'ploc2line1': 'string',
+    'ploc2line2': 'string',
+    'ploc2cityname': 'string',
+    'ploc2statename': 'string',
+    'ploc2zip': 'string',
+    'ploc2tel': 'string',
     'pcredential': 'string',
     'pcredentialoth': 'string',
     'porgnameothcode': 'Int64',
