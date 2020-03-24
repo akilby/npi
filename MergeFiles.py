@@ -135,8 +135,10 @@ def locate_file(folder, year, month, variable):
     '''
     '''
     paths1 = get_filepaths_from_single_variable_files(variable, folder, False)
-    paths2 = get_filepaths_from_dissemination_zips(folder)
-    paths3 = get_secondary_loc_filepaths_from_dissemination_zips(folder)
+    if not variable.startswith('ploc2'):
+        paths2 = get_filepaths_from_dissemination_zips(folder)
+    else:
+        paths2 = get_secondary_loc_filepaths_from_dissemination_zips(folder)
     try:
         return paths1[(year, month)]
     except KeyError:
