@@ -312,6 +312,17 @@ class NPI(object):
         df['pfname'] = df.pfname.apply(lambda x: _delete(x, ')'))
         return df
 
+        def get_expanded_fullnames(self):
+            if hasattr(self, 'expanded_fullnames'):
+                return
+            self.get_fullnames()
+            f = self.fullnames.copy()
+            f.drop(columns=['othflag', 'name'], inplace=True)
+            idvar = 'npi'
+            (firstname, middlename, lastname) = ('pfname', 'pmname', 'plname')
+            self.expanded_fullnames = expand_names_in_sensible_ways(
+                f, idvar, firstname, middlename, lastname)
+
 
 def purge_nulls(df, var, mergeon):
     '''
@@ -358,3 +369,33 @@ def _delete(x, obj): return ((x.replace(obj, '') if obj in x else x)
 
 
 def _in_multi(x, list_objs): return any([_in(x, obj) for obj in list_objs])
+
+
+def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
+    # one middle initial
+    df['minit'] = df[middlename].str[:1]
+    # no middle name
+    df['mblank'] = ''
+    expanded_full = (df.drop(columns=['minit', 'mblank'])
+                       .append((df.drop(columns=[middlename, 'mblank'])
+                                  .rename(columns={'minit': middlename})))
+                       .append((df.drop(columns=[middlename, 'minit'])
+                                  .rename(columns={'mblank': middlename})))
+                       .drop_duplicates())
+    expanded_full2 = expanded_full.copy()
+    # delete all periods
+    for nam in [firstname, middlename, lastname]:
+        expanded_full2[nam] = expanded_full[nam].str.replace('.', '')
+    expanded_full = (expanded_full.append(expanded_full2)
+                                  .drop_duplicates()
+                                  .sort_values(idvar)
+                                  .reset_index(drop=True))
+    # turn into one name column
+    expanded_full.loc[expanded_full[middlename] == '', 'name'] = (
+        expanded_full[firstname] + ' ' + expanded_full[lastname])
+    expanded_full.loc[expanded_full[middlename] != '', 'name'] = (
+        expanded_full[firstname] + ' ' + expanded_full[middlename]
+        + ' ' + expanded_full[lastname])
+    k = [idvar, firstname, middlename, lastname, 'name']
+    expanded_full = expanded_full[k].drop_duplicates()
+    return expanded_full

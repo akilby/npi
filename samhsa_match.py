@@ -3,16 +3,10 @@ import re
 import time
 
 import pandas as pd
+from NPI_Clean import NPI, expand_names_in_sensible_ways, src
 
 unmatched = pd.read_csv('/work/akilby/npi/raw_samhsa/check.csv')
-samhsa = pd.read_csv(
-    '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv',
-    low_memory=False)
-samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
-                              'First name', 'Last name', 'npi', 'NPI state',
-                              'Date', 'CurrentPatientLimit', 'Telephone',
-                              'zip', 'zcta5', 'geoid', 'Index',
-                              'NumberPatientsCertifiedFor'])
+source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
 
 npi = NPI(src=src)
 npi.retrieve('fullnames')
@@ -21,24 +15,94 @@ npi.retrieve('taxcode')
 npi.retrieve('locstatename')
 
 
-samhsa = pd.read_csv(
-    '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv',
-    low_memory=False)
-samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
-                              'First name', 'Last name', 'npi', 'NPI state',
-                              'Date', 'CurrentPatientLimit', 'Telephone',
-                              'zip', 'zcta5', 'geoid', 'Index',
-                              'NumberPatientsCertifiedFor', 'statecode'])
-samhsa['NameFull'] = samhsa.NameFull.str.upper()
+class SAMHSA(object):
+    def __init__(self, src):
+        self.source_file = src
+        self.samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
 
-uvars = ['NameFull', 'PractitionerType', 'DateLastCertified', 'Street1',
-         'City', 'State', 'Zip', 'County', 'Phone']
+    def make_samhsa_id(self, samhsa, idvars=['NameFull', 'DateLastCertified',
+                                             'PractitionerType']):
+        """
+        SAMHSA files do not have an identifier. Make an arbitrary one for
+        tracking throughout the class. Note: this will not be stable across
+        different versions of the SAMHSA data
+        """
+        for idvar in idvars:
+            samhsa[idvar] = samhsa[idvar].str.upper()
+        ids = (samhsa[idvars].drop_duplicates()
+                             .reset_index(drop=True)
+                             .reset_index()
+                             .rename(columns=dict(index='samhsa_id')))
+        return samhsa.merge(ids)
 
-mindate = (samhsa[uvars + ['DateGranted']].dropna()
-                                          .groupby(uvars).min().reset_index())
+    def get_names(self, namecol='NameFull'):
+        names = (self.samhsa[[namecol, 'samhsa_id']]
+                     .drop_duplicates()
+                     .sort_values('samhsa_id')
+                     .reset_index(drop=True))
+        # remove credentials from end
+        badl = credential_suffixes()
+        names = remove_suffixes(names, badl)
+        names[namecol] = remove_mi_periods(names[namecol])
+        while not remove_suffixes(names.copy(), badl).equals(names.copy()):
+            names = remove_suffixes(names, badl)
+
+        # split into first, middle, last -- note that a maiden name is middle
+        # name here, could maybe use that later
+
+        names_long = (names[namecol].str.replace('    ', ' ')
+                                    .str.replace('   ', ' ')
+                                    .str.replace('  ', ' ')
+                                    .str.split(' ', expand=True)
+                                    .stack()
+                                    .reset_index())
+
+        firstnames = names_long.groupby('level_0').first().reset_index()
+        lastnames = names_long.groupby('level_0').last().reset_index()
+        middlenames = (names_long.merge(firstnames, how='left', indicator=True)
+                                 .query('_merge=="left_only"')
+                                 .drop(columns='_merge')
+                                 .merge(lastnames, how='left', indicator=True)
+                                 .query('_merge=="left_only"')
+                                 .drop(columns='_merge')
+                                 .set_index(['level_0', 'level_1']).unstack(1))
+        middlenames = middlenames.fillna('').agg(' '.join, axis=1).str.strip()
+        
+        allnames = (firstnames.merge(pd.DataFrame(middlenames),
+                                     left_index=True, right_index=True,
+                                     how='outer')
+                              .merge(lastnames,
+                                     left_index=True, right_index=True)
+                              .fillna('')
+                              .drop(columns=['level_1_x', 'level_1_y'])
+                              .rename(columns={'0_x': 'firstname', '0_y':
+                                               'middlename', 0: 'lastname'}))
+        names = pd.concat([allnames, names], axis=1)
+        
+        cols = ['firstname', 'middlename', 'lastname', 'samhsa_id']
+        newnames = expand_names_in_sensible_ways(
+            names[cols].reset_index(drop=True),
+            'samhsa_id', 'firstname', 'middlename', 'lastname')
+        newnames = (newnames.append(names[cols + ['NameFull']].rename(
+                                columns={'NameFull': 'name'}))
+                            .drop_duplicates())
+
+        self.names = newnames.merge(names[['samhsa_id', 'Credential String']])
+
+
+
+# samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
+#                               'First name', 'Last name', 'npi', 'NPI state',
+#                               'Date', 'CurrentPatientLimit', 'Telephone',
+#                               'zip', 'zcta5', 'geoid', 'Index',
+#                               'NumberPatientsCertifiedFor', 'statecode'])
+
+mindate = (samhsa[['samhsa_id', 'DateGranted']].dropna()
+                                               .groupby('samhsa_id')
+                                               .min().reset_index())
 
 samhsa = (samhsa.fillna('')
-                .groupby(['NameFull', 'PractitionerType',
+                .groupby(['NameFull', 'samhsa_id', 'PractitionerType',
                           'DateLastCertified', 'Street1', 'Street2',
                           'City', 'State', 'Zip', 'County', 'Phone'])
                 .agg({'WaiverType': max})
@@ -46,54 +110,53 @@ samhsa = (samhsa.fillna('')
 
 samhsa = samhsa.merge(mindate, how='left')
 
-badl = ['(JR.)', '(M.D.)', '(RET.)', 'M., PH', 'M. D.', 'M.D.,',
-        'M.D., PHD, DABA,',
-        'M .D.', 'M.D.', 'MD', 'NP', 'D.O.', 'PA', 'DO', '.D.', 'MPH',
-        'PH.D.', 'JR', 'M.D', 'PHD', 'P.A.', 'FNP', 'PA-C', 'M.P.H.',
-        'N.P.', 'III', 'SR.', 'D.', '.D', 'FASAM', 'JR.', 'MS',
-        'D', 'FAAFP', 'SR', 'D.O', 'CNS', 'F.A.S.A.M.', 'FNP-BC', 'P.C.',
-        'MBA', 'M.S.', 'PH.D', 'FACP', 'M.P.H', 'CNM',
-        'NP-C', 'MR.', 'MDIV', 'FACEP', 'PLLC', 'M.A.', 'LLC', 'MR',
-        'DNP', 'PHD.', 'FNP-C', 'MD.', 'CNP', 'J.D.', 'IV', 'F.A.P.A.',
-        'DR.', 'M.D,', 'DABPM', 'M,D.', 'MS.', 'FACOOG']
 
-badl2 = (pd.read_csv('/work/akilby/npi/stubs_rev.csv')
-           .rename(columns={'Unnamed: 2': 'flag'})
-           .query('flag==1')['Unnamed: 0']
-           .tolist())
+def credential_suffixes():
+    badl = ['(JR.)', '(M.D.)', '(RET.)', 'M., PH', 'M. D.', 'M.D.,',
+            'M.D., PHD, DABA,',
+            'M .D.', 'M.D.', 'MD', 'NP', 'D.O.', 'PA', 'DO', '.D.', 'MPH',
+            'PH.D.', 'JR', 'M.D', 'PHD', 'P.A.', 'FNP', 'PA-C', 'M.P.H.',
+            'N.P.', 'III', 'SR.', 'D.', '.D', 'FASAM', 'JR.', 'MS',
+            'D', 'FAAFP', 'SR', 'D.O', 'CNS', 'F.A.S.A.M.', 'FNP-BC', 'P.C.',
+            'MBA', 'M.S.', 'PH.D', 'FACP', 'M.P.H', 'CNM',
+            'NP-C', 'MR.', 'MDIV', 'FACEP', 'PLLC', 'M.A.', 'LLC', 'MR',
+            'DNP', 'PHD.', 'FNP-C', 'MD.', 'CNP', 'J.D.', 'IV', 'F.A.P.A.',
+            'DR.', 'M.D,', 'DABPM', 'M,D.', 'MS.', 'FACOOG']
 
-badl = badl + badl2
+    badl2 = (pd.read_csv('/work/akilby/npi/stubs_rev.csv')
+               .rename(columns={'Unnamed: 2': 'flag'})
+               .query('flag==1')['Unnamed: 0']
+               .tolist())
+
+    badl = badl + badl2
+    return badl
 
 
 def remove_suffixes(samhsa, badl):
+    name_col = samhsa.columns.tolist()[0]
     for b in badl:
-        samhsa.loc[samhsa.NameFull.apply(lambda x: x.endswith(' ' + b)),
-                   'Credential String'] = (samhsa.NameFull
-                                                 .apply(lambda x:
-                                                        x[len(x)-len(b):]))
-        samhsa['NameFull'] = (samhsa.NameFull
-                                    .apply(lambda x: x[:len(x)-len(b)]
-                                           if x.endswith(' ' + b) else x))
-        samhsa['NameFull'] = samhsa['NameFull'].str.strip()
-        samhsa['NameFull'] = (samhsa.NameFull
-                                    .apply(lambda x: x[:-1]
-                                           if x.endswith(',') else x))
+        samhsa.loc[samhsa[name_col].apply(lambda x: x.endswith(' ' + b)),
+                   'Credential String'] = (samhsa[name_col].apply(
+                    lambda x: x[len(x)-len(b):]))
+        samhsa[name_col] = (samhsa[name_col].apply(
+            lambda x: x[:len(x)-len(b)] if x.endswith(' ' + b) else x))
+        samhsa[name_col] = samhsa[name_col].str.strip()
+        samhsa[name_col] = (samhsa[name_col].apply(
+            lambda x: x[:-1] if x.endswith(',') else x))
     return samhsa
 
 
-samhsa = remove_suffixes(samhsa, badl)
-samhsa['NameFull'] = samhsa.NameFull.apply(
-    lambda x: re.sub('(.*\s[A-Z]?)(\.)(\s)', r'\1\3', x))
+def remove_mi_periods(col):
+    return col.apply(lambda x: re.sub('(.*\s[A-Z]?)(\.)(\s)', r'\1\3', x))
 
 
-samhsa = remove_suffixes(samhsa, badl)
-assert remove_suffixes(samhsa.copy(), badl).equals(samhsa.copy())
+
+        name_matches = expanded_fullnames[['name','npi']].merge(expanded_names[['name','samhsa_id']])
 
 
-df.loc[df.pmname=='', 'name']=df.pfname + ' ' + df.plname 
-df.loc[df.pmname!='', 'name']=df.pfname + ' ' + df.pmname + ' ' + df.plname 
-# 
 # taxcode.merge(credentials, how='outer')
+
+samhsa.merge(npi.fullnames[['npi','name']], left_on='NameFull', right_on='name').merge(npi.credentials, how='left', on='npi').merge(npi.taxcode, how='left', on='npi')
 
 
 def check_in(it, li):
