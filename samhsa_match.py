@@ -8,11 +8,11 @@ from NPI_Clean import NPI, expand_names_in_sensible_ways, src
 unmatched = pd.read_csv('/work/akilby/npi/raw_samhsa/check.csv')
 source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
 
-npi = NPI(src=src)
-npi.retrieve('fullnames')
-npi.retrieve('credentials')
-npi.retrieve('taxcode')
-npi.retrieve('locstatename')
+# npi = NPI(src=src)
+# npi.retrieve('fullnames')
+# npi.retrieve('credentials')
+# npi.retrieve('taxcode')
+# npi.retrieve('locstatename')
 
 
 class SAMHSA(object):
@@ -97,18 +97,18 @@ class SAMHSA(object):
 #                               'zip', 'zcta5', 'geoid', 'Index',
 #                               'NumberPatientsCertifiedFor', 'statecode'])
 
-mindate = (samhsa[['samhsa_id', 'DateGranted']].dropna()
-                                               .groupby('samhsa_id')
-                                               .min().reset_index())
-
-samhsa = (samhsa.fillna('')
-                .groupby(['NameFull', 'samhsa_id', 'PractitionerType',
-                          'DateLastCertified', 'Street1', 'Street2',
-                          'City', 'State', 'Zip', 'County', 'Phone'])
-                .agg({'WaiverType': max})
-                .reset_index())
-
-samhsa = samhsa.merge(mindate, how='left')
+# mindate = (samhsa[['samhsa_id', 'DateGranted']].dropna()
+#                                                .groupby('samhsa_id')
+#                                                .min().reset_index())
+# 
+# samhsa = (samhsa.fillna('')
+#                 .groupby(['NameFull', 'samhsa_id', 'PractitionerType',
+#                           'DateLastCertified', 'Street1', 'Street2',
+#                           'City', 'State', 'Zip', 'County', 'Phone'])
+#                 .agg({'WaiverType': max})
+#                 .reset_index())
+# 
+# samhsa = samhsa.merge(mindate, how='left')
 
 
 def credential_suffixes():
@@ -151,12 +151,12 @@ def remove_mi_periods(col):
 
 
 
-        name_matches = expanded_fullnames[['name','npi']].merge(expanded_names[['name','samhsa_id']])
-
-
-# taxcode.merge(credentials, how='outer')
-
-samhsa.merge(npi.fullnames[['npi','name']], left_on='NameFull', right_on='name').merge(npi.credentials, how='left', on='npi').merge(npi.taxcode, how='left', on='npi')
+# name_matches = expanded_fullnames[['name','npi']].merge(expanded_names[['name','samhsa_id']])
+# 
+# 
+# # taxcode.merge(credentials, how='outer')
+# 
+# samhsa.merge(npi.fullnames[['npi','name']], left_on='NameFull', right_on='name').merge(npi.credentials, how='left', on='npi').merge(npi.taxcode, how='left', on='npi')
 
 
 def check_in(it, li):

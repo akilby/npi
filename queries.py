@@ -12,7 +12,7 @@ def likely_doctors():
                                                   .str.strip()
                                                   .str.upper())
     md_do = npi.credentials.query('stripped=="MD" or stripped=="DO"')
-    
+
     doctors = (pd.concat(
         [md_do.npi,
          npi.taxcode.query('cat=="MD/DO" or cat=="MD/DO Student"').npi])
