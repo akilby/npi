@@ -10,6 +10,7 @@ source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
 
 # npi = NPI(src=src)
 # npi.retrieve('fullnames')
+# npi.retrieve('expanded_fullnames')
 # npi.retrieve('credentials')
 # npi.retrieve('taxcode')
 # npi.retrieve('locstatename')

@@ -317,7 +317,7 @@ class NPI(object):
             return
         self.get_fullnames()
         f = self.fullnames.copy()
-        f.drop(columns=['othflag', 'name'], inplace=True)
+        f.drop(columns=['othflag'], inplace=True)
         idvar = 'npi'
         (firstname, middlename, lastname) = ('pfname', 'pmname', 'plname')
         self.expanded_fullnames = expand_names_in_sensible_ways(
