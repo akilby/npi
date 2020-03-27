@@ -312,16 +312,16 @@ class NPI(object):
         df['pfname'] = df.pfname.apply(lambda x: _delete(x, ')'))
         return df
 
-        def get_expanded_fullnames(self):
-            if hasattr(self, 'expanded_fullnames'):
-                return
-            self.get_fullnames()
-            f = self.fullnames.copy()
-            f.drop(columns=['othflag', 'name'], inplace=True)
-            idvar = 'npi'
-            (firstname, middlename, lastname) = ('pfname', 'pmname', 'plname')
-            self.expanded_fullnames = expand_names_in_sensible_ways(
-                f, idvar, firstname, middlename, lastname)
+    def get_expanded_fullnames(self):
+        if hasattr(self, 'expanded_fullnames'):
+            return
+        self.get_fullnames()
+        f = self.fullnames.copy()
+        f.drop(columns=['othflag', 'name'], inplace=True)
+        idvar = 'npi'
+        (firstname, middlename, lastname) = ('pfname', 'pmname', 'plname')
+        self.expanded_fullnames = expand_names_in_sensible_ways(
+            f, idvar, firstname, middlename, lastname)
 
 
 def purge_nulls(df, var, mergeon):
