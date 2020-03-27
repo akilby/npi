@@ -1,51 +1,23 @@
 import pandas as pd
-
-other_md_codes = ['202C00000X', '202K00000X', '204C00000X',
-                  '204D00000X', '204E00000X', '204F00000X',
-                  '204R00000X', '209800000X']
+from NPI_Clean import NPI, src
 
 
 def likely_doctors():
-    df_tax = pd.read_csv('/work/akilby/npi/data/ptaxcode.csv')
-    df_tax['prefix'] = df_tax.ptaxcode.str[:3]
-    md_do_student = df_tax.query(
-        'prefix=="207" or prefix=="208" or ptaxcode=="390200000X"')
-    md_do_student = md_do_student[['npi', 'month']].drop_duplicates()
-
-    md_do_student2 = df_tax.merge(pd.DataFrame({'ptaxcode': other_md_codes}))
-    md_do_student2 = md_do_student2[['npi', 'month']].drop_duplicates()
-
-    md_do_student = md_do_student.append(md_do_student2)
+    npi = NPI(src=src)
+    npi.retrieve('credentials')
+    npi.retrieve('taxcode')
+    npi.credentials['stripped'] = (npi.credentials.pcredential
+                                                  .str.replace('.', '')
+                                                  .str.replace(' ', '')
+                                                  .str.strip()
+                                                  .str.upper())
+    md_do = npi.credentials.query('stripped=="MD" or stripped=="DO"')
     
-    # only want individuals
-    df_entity = pd.read_csv('/work/akilby/npi/data/entity.csv')
-    md_do_student = md_do_student.merge(df_entity, how='left')
-    md_do_student = md_do_student.query("entity==1").drop(columns=['entity'])
-
-    # Look in credentials
-    df_pcredential = pd.read_csv('/work/akilby/npi/data/pcredential.csv')
-    df_pcredential['stripped'] = (df_pcredential.pcredential
-                                                .str.replace('.', '')
-                                                .str.replace(' ', '')
-                                                .str.strip()
-                                                .str.upper())
-    md_do = df_pcredential.query('stripped=="MD" or stripped=="DO"')
-    
-    df_pcredentialoth = pd.read_csv('/work/akilby/npi/data/pcredentialoth.csv')
-    df_pcredentialoth['stripped'] = (df_pcredentialoth.dropna()
-                                                      .pcredentialoth
-                                                      .str.replace('.', '')
-                                                      .str.replace(' ', '')
-                                                      .str.strip()
-                                                      .str.upper())
-    md_do2 = df_pcredentialoth.query('stripped=="MD" or stripped=="DO"')
-
-    cred = pd.concat([md_do[['npi']].drop_duplicates(),
-                      md_do2[['npi']].drop_duplicates()])
-
-    md_all = (pd.concat([cred, md_do_student[['npi']].drop_duplicates()])
-                .drop_duplicates())
-    return md_all
+    doctors = (pd.concat(
+        [md_do.npi,
+         npi.taxcode.query('cat=="MD/DO" or cat=="MD/DO Student"').npi])
+                 .drop_duplicates())
+    return doctors
 
 
 def medicaid_providers(state=None,
