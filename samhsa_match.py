@@ -8,47 +8,6 @@ from NPI_Clean import NPI, expand_names_in_sensible_ways, src
 unmatched = pd.read_csv('/work/akilby/npi/raw_samhsa/check.csv')
 source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
 
-npi = NPI(src=src)
-npi.retrieve('fullnames')
-npi.retrieve('expanded_fullnames')
-npi.retrieve('credentials')
-npi.retrieve('taxcode')
-npi.retrieve('locstatename')
-npi.retrieve('loczip')
-
-new = (npi.expanded_fullnames
-          .merge((npi.taxcode
-                     .dropna()
-                     .assign(practype=lambda x:
-                             x.cat.str.replace(' Student', ''))
-                     .drop(columns=['cat', 'ptaxcode'])
-                     .drop_duplicates()), how='left')
-          .merge((npi.locstatename[['npi', 'plocstatename']]
-                     .drop_duplicates()), how='left'))
-
-q = 'pcredential_stripped=="MD" or pcredential_stripped=="DO"'
-
-new = (new.append((new.merge(new.loc[new.practype == "MD/DO"][['npi']]
-                                .drop_duplicates()
-                                .merge(npi.credentials
-                                          .query(q)[['npi']]
-                                          .drop_duplicates(),
-                                       how='outer', indicator=True)
-                                .query('_merge=="right_only"')
-                                .drop(columns='_merge'))
-                      .fillna(value={'practype': 'MD/DO'})
-                      .append((new.merge(
-                        new.loc[new.practype == "MD/DO"][['npi']]
-                           .drop_duplicates()
-                           .merge(npi.credentials.query(q)[['npi']]
-                                                 .drop_duplicates(),
-                                  how='outer', indicator=True)
-                           .query('_merge=="right_only"')
-                           .drop(columns='_merge'))
-                                  .assign(practype='MD/DO')))
-                      .drop_duplicates()))
-          .drop_duplicates())
-
 
 class SAMHSA(object):
     def __init__(self, src):
@@ -124,6 +83,47 @@ class SAMHSA(object):
 
         self.names = newnames.merge(names[['samhsa_id', 'Credential String']])
 
+npi = NPI(src=src)
+npi.retrieve('fullnames')
+npi.retrieve('expanded_fullnames')
+npi.retrieve('credentials')
+npi.retrieve('taxcode')
+npi.retrieve('locstatename')
+npi.retrieve('loczip')
+
+new = (npi.expanded_fullnames
+          .merge((npi.taxcode
+                     .dropna()
+                     .assign(practype=lambda x:
+                             x.cat.str.replace(' Student', ''))
+                     .drop(columns=['cat', 'ptaxcode'])
+                     .drop_duplicates()), how='left')
+          .merge((npi.locstatename[['npi', 'plocstatename']]
+                     .drop_duplicates()), how='left'))
+
+q = 'pcredential_stripped=="MD" or pcredential_stripped=="DO"'
+
+new = (new.append((new.merge(new.loc[new.practype == "MD/DO"][['npi']]
+                                .drop_duplicates()
+                                .merge(npi.credentials
+                                          .query(q)[['npi']]
+                                          .drop_duplicates(),
+                                       how='outer', indicator=True)
+                                .query('_merge=="right_only"')
+                                .drop(columns='_merge'))
+                      .fillna(value={'practype': 'MD/DO'})
+                      .append((new.merge(
+                        new.loc[new.practype == "MD/DO"][['npi']]
+                           .drop_duplicates()
+                           .merge(npi.credentials.query(q)[['npi']]
+                                                 .drop_duplicates(),
+                                  how='outer', indicator=True)
+                           .query('_merge=="right_only"')
+                           .drop(columns='_merge'))
+                                  .assign(practype='MD/DO')))
+                      .drop_duplicates()))
+          .drop_duplicates())
+
 
 s = SAMHSA(src)
 sam = s.names.merge(s.samhsa[['PractitionerType', 'State', 'samhsa_id']].drop_duplicates())
@@ -171,8 +171,8 @@ matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 remainders3 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
 
 
-new3 = new2[['npi','name','practype']].drop_duplicates()
-match4 = remainders3[['name','PractitionerType','samhsa_id']].drop_duplicates().merge(new3, left_on=['name','PractitionerType'], right_on=['name','practype'])
+new3 = new2[['npi', 'name', 'practype']].drop_duplicates()
+match4 = remainders3[['name', 'PractitionerType', 'samhsa_id']].drop_duplicates().merge(new3, left_on=['name','PractitionerType'], right_on=['name','practype'])
 match4 = match4[['samhsa_id', 'npi']].drop_duplicates()
 match4 = match4[~match4.samhsa_id.isin(match4[match4.samhsa_id.duplicated()].samhsa_id.drop_duplicates())]
 matches = matches.append(match4[['samhsa_id', 'npi']].drop_duplicates())
@@ -181,7 +181,7 @@ matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 remainders4 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
 
 
-new4 = new2.query('pmname!=""')[['npi','name','practype']].drop_duplicates()
+new4 = new2.query('pmname!=""')[['npi', 'name', 'practype']].drop_duplicates()
 match5 = remainders4.query('middlename!=""')[['name','PractitionerType','samhsa_id']].drop_duplicates().merge(new4, left_on=['name','PractitionerType'], right_on=['name','practype'])
 match5 = match5[['samhsa_id', 'npi']].drop_duplicates()
 match5 = match5[~match5.samhsa_id.isin(match5[match5.samhsa_id.duplicated()].samhsa_id.drop_duplicates())]
@@ -191,14 +191,95 @@ matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 remainders5 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
 
 
+remainders5['name_nochars']=remainders5['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
+new2['name_nochars']=new2['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
+new['name_nochars']=new['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
+
+sam_zips = s.names.merge(s.samhsa[['PractitionerType', 'Zip', 'samhsa_id']].drop_duplicates())
+sam_zips['zip'] = sam_zips.Zip.str[:5]
+sam_zips = sam_zips.drop(columns="Zip").drop_duplicates()
+
+a1 = remainders5.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name_nochars','practype','plocstatename'])
+a2 = remainders5.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name','practype','plocstatename'])
+a3 = remainders5.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name_nochars','practype','zip'])
+a4 = remainders5.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name','practype','zip'])
+
+newmatched_a = a3.append(a4)[['samhsa_id', 'npi']].drop_duplicates()
+dups = newmatched_a[['npi']][newmatched_a[['npi']].duplicated()]
+dups2 = newmatched_a[['samhsa_id']][newmatched_a[['samhsa_id']].duplicated()]
+newmatched_a = newmatched_a[~newmatched_a.samhsa_id.isin(dups2.samhsa_id)]
+newmatched_a = newmatched_a[~newmatched_a.npi.isin(dups.npi)]
+newmatched_a.drop_duplicates()
+newmatched_a.samhsa_id.drop_duplicates()
+newmatched_a.npi.drop_duplicates()
+matches = matches.append(newmatched_a[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+
+newmatched_b = a1.append(a2)[['samhsa_id', 'npi']].drop_duplicates()
+newmatched_b = newmatched_b.merge(newmatched_a['samhsa_id'], indicator=True, how='left').query('_merge!="both"').drop(columns='_merge')
+dups = newmatched_b[['npi']][newmatched_b[['npi']].duplicated()]
+dups2 = newmatched_b[['samhsa_id']][newmatched_b[['samhsa_id']].duplicated()]
+newmatched_b = newmatched_b[~newmatched_b.samhsa_id.isin(dups2.samhsa_id)]
+newmatched_b = newmatched_b[~newmatched_b.npi.isin(dups.npi)]
+newmatched_b.drop_duplicates()
+newmatched_b.samhsa_id.drop_duplicates()
+newmatched_b.npi.drop_duplicates()
+matches = matches.append(newmatched_b[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+
+remainders6 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
+remainders6['name_nochars']=remainders6['name'].str.replace("'","").str.replace('-','').str.replace('.','')
+new2['name_nochars']=new2['name'].str.replace("'","").str.replace('-',' ').str.replace('.','')
+new['name_nochars']=new['name'].str.replace("'","").str.replace('-',' ').str.replace('.','')
+a1 = remainders6.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name_nochars','practype','plocstatename'])
+a2 = remainders6.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name','practype','plocstatename'])
+a3 = remainders6.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name_nochars','practype','zip'])
+a4 = remainders6.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name','practype','zip'])
+newmatched_a = a3.append(a4)[['samhsa_id', 'npi']].drop_duplicates()
+dups = newmatched_a[['npi']][newmatched_a[['npi']].duplicated()]
+dups2 = newmatched_a[['samhsa_id']][newmatched_a[['samhsa_id']].duplicated()]
+newmatched_a = newmatched_a[~newmatched_a.samhsa_id.isin(dups2.samhsa_id)]
+newmatched_a = newmatched_a[~newmatched_a.npi.isin(dups.npi)]
+newmatched_a.drop_duplicates()
+newmatched_a.samhsa_id.drop_duplicates()
+newmatched_a.npi.drop_duplicates()
+matches = matches.append(newmatched_a[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+
+newmatched_b = a1.append(a2)[['samhsa_id', 'npi']].drop_duplicates()
+newmatched_b = newmatched_b.merge(newmatched_a['samhsa_id'], indicator=True, how='left').query('_merge!="both"').drop(columns='_merge')
+dups = newmatched_b[['npi']][newmatched_b[['npi']].duplicated()]
+dups2 = newmatched_b[['samhsa_id']][newmatched_b[['samhsa_id']].duplicated()]
+newmatched_b = newmatched_b[~newmatched_b.samhsa_id.isin(dups2.samhsa_id)]
+newmatched_b = newmatched_b[~newmatched_b.npi.isin(dups.npi)]
+newmatched_b.drop_duplicates()
+newmatched_b.samhsa_id.drop_duplicates()
+newmatched_b.npi.drop_duplicates()
+matches = matches.append(newmatched_b[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+
+matches = matches.append(pd.DataFrame({'samhsa_id': [3796, 3795, 214], 'npi': [1699731661, 1720044811, 1770933707]})).drop_duplicates().sort_values('samhsa_id').reset_index(drop=True)
+
+remainders7 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi']).merge(sam_zips, how='left')
+matches.to_csv('/work/akilby/npi/samhsa_npi_partial_match.csv')
+usable_data = s.samhsa.drop(columns='npi').merge(matches, on='samhsa_id').sort_values('npi').drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent','First name', 'Last name','NPI state','Date',  'statecode', 'geoid', 'zcta5', 'zip', 'Index'])
+
+usable_data = usable_data.drop_duplicates().reset_index(drop=True)
+
+usable_data['Date']=usable_data['DateGranted']
+usable_data.loc[usable_data['Date'].isnull(), 'Date'] = usable_data['DateLastCertified']
+
+usable_data.to_csv('/work/akilby/npi/samhsa_npi_usable_data.csv')
+
 #these all actually look correct
 matches[matches.samhsa_id.isin(matches[matches.samhsa_id.duplicated()].samhsa_id)].head(60)
 
-
 # check for special characters
-"ELIZABETH MARIE O DAIR" == "ELIZABETH MARIE O'DAIR"
-"STEPHAINE JULIA HUCKER" == "STEPHAINE HUCKER"
-"ELIZABETH M LIDSTONE JAYANATH" == "ELIZABETH  MAUDE LIDSTONE-JAYANATH"
+
 
 # samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
 #                               'First name', 'Last name', 'npi', 'NPI state',

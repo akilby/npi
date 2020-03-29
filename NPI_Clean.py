@@ -7,9 +7,10 @@ src = '/work/akilby/npi/data/'
 
 
 class NPI(object):
-    def __init__(self, src):
+    def __init__(self, src, npis=None):
         self.src = src
         self.get_entity()
+        self.npis = npis
 
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
@@ -17,8 +18,9 @@ class NPI(object):
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
-        src = self.src
-        entity = pd.read_csv(os.path.join(src, 'entity.csv'))
+        rfile = os.path.join(self.src, 'entity.csv')
+        entity = (pd.read_csv(rfile) if not self.npis
+                  else read_csv_npi(rfile, self.npis))
         entity = entity.dropna()
         entity['entity'] = entity.entity.astype("int")
         self.entity = entity[['npi', 'entity']].drop_duplicates()
@@ -69,6 +71,27 @@ class NPI(object):
             return
         self.lnameoth = self.get_nameoth('lnameoth')
 
+    def get_locline1(self):
+        if hasattr(self, 'locline1'):
+            return
+        src = self.src
+        locline1 = pd.read_csv(os.path.join(src, 'locline1.csv'))
+        self.locline1 = locline1
+
+    def get_locline2(self):
+        if hasattr(self, 'locline2'):
+            return
+        src = self.src
+        locline2 = pd.read_csv(os.path.join(src, 'locline2.csv'))
+        self.locline2 = locline2
+
+    def get_loccityname(self):
+        if hasattr(self, 'loccityname'):
+            return
+        src = self.src
+        loccityname = pd.read_csv(os.path.join(src, 'ploccityname.csv'))
+        self.loccityname = loccityname
+
     def get_locstatename(self):
         if hasattr(self, 'locstatename'):
             return
@@ -82,6 +105,13 @@ class NPI(object):
         src = self.src
         loczip = pd.read_csv(os.path.join(src, 'ploczip.csv'))
         self.loczip = loczip
+
+    def get_loctel(self):
+        if hasattr(self, 'loczip'):
+            return
+        src = self.src
+        loctel = pd.read_csv(os.path.join(src, 'ploctel.csv'))
+        self.loctel = loctel
 
     def get_cred(self, name_stub):
         src = self.src
@@ -412,3 +442,11 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
     k = [idvar, firstname, middlename, lastname, 'name']
     expanded_full = expanded_full[k].drop_duplicates()
     return expanded_full
+
+
+def read_csv_npi(readfile, npis):
+    chunks = pd.read_csv(readfile, chunksize=500000)
+    li = []
+    for chunk in chunks:
+        li.append(chunk[chunk['npi'].isin(npis)])
+    return pd.concat(li)
