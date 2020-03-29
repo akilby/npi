@@ -8,12 +8,46 @@ from NPI_Clean import NPI, expand_names_in_sensible_ways, src
 unmatched = pd.read_csv('/work/akilby/npi/raw_samhsa/check.csv')
 source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
 
-# npi = NPI(src=src)
-# npi.retrieve('fullnames')
-# npi.retrieve('expanded_fullnames')
-# npi.retrieve('credentials')
-# npi.retrieve('taxcode')
-# npi.retrieve('locstatename')
+npi = NPI(src=src)
+npi.retrieve('fullnames')
+npi.retrieve('expanded_fullnames')
+npi.retrieve('credentials')
+npi.retrieve('taxcode')
+npi.retrieve('locstatename')
+npi.retrieve('loczip')
+
+new = (npi.expanded_fullnames
+          .merge((npi.taxcode
+                     .dropna()
+                     .assign(practype=lambda x:
+                             x.cat.str.replace(' Student', ''))
+                     .drop(columns=['cat', 'ptaxcode'])
+                     .drop_duplicates()), how='left')
+          .merge((npi.locstatename[['npi', 'plocstatename']]
+                     .drop_duplicates()), how='left'))
+
+q = 'pcredential_stripped=="MD" or pcredential_stripped=="DO"'
+
+new = (new.append((new.merge(new.loc[new.practype == "MD/DO"][['npi']]
+                                .drop_duplicates()
+                                .merge(npi.credentials
+                                          .query(q)[['npi']]
+                                          .drop_duplicates(),
+                                       how='outer', indicator=True)
+                                .query('_merge=="right_only"')
+                                .drop(columns='_merge'))
+                      .fillna(value={'practype': 'MD/DO'})
+                      .append((new.merge(
+                        new.loc[new.practype == "MD/DO"][['npi']]
+                           .drop_duplicates()
+                           .merge(npi.credentials.query(q)[['npi']]
+                                                 .drop_duplicates(),
+                                  how='outer', indicator=True)
+                           .query('_merge=="right_only"')
+                           .drop(columns='_merge'))
+                                  .assign(practype='MD/DO')))
+                      .drop_duplicates()))
+          .drop_duplicates())
 
 
 class SAMHSA(object):
@@ -68,7 +102,7 @@ class SAMHSA(object):
                                  .drop(columns='_merge')
                                  .set_index(['level_0', 'level_1']).unstack(1))
         middlenames = middlenames.fillna('').agg(' '.join, axis=1).str.strip()
-        
+
         allnames = (firstnames.merge(pd.DataFrame(middlenames),
                                      left_index=True, right_index=True,
                                      how='outer')
@@ -79,7 +113,7 @@ class SAMHSA(object):
                               .rename(columns={'0_x': 'firstname', '0_y':
                                                'middlename', 0: 'lastname'}))
         names = pd.concat([allnames, names], axis=1)
-        
+
         cols = ['firstname', 'middlename', 'lastname', 'samhsa_id']
         newnames = expand_names_in_sensible_ways(
             names[cols].reset_index(drop=True),
@@ -91,6 +125,39 @@ class SAMHSA(object):
         self.names = newnames.merge(names[['samhsa_id', 'Credential String']])
 
 
+s = SAMHSA(src)
+sam = s.names.merge(s.samhsa[['PractitionerType', 'State', 'samhsa_id']].drop_duplicates())
+samhsa_matches = sam.drop(columns=['firstname', 'middlename', 'lastname', 'Credential String']).merge(new.drop(columns=['pfname','pmname','plname']), left_on=['name','PractitionerType','State'], right_on=['name','practype','plocstatename'])
+samhsa_matches = samhsa_matches.merge(samhsa_matches[['samhsa_id', 'npi']].drop_duplicates().groupby('samhsa_id').count().reset_index().query('npi>1').drop(columns='npi'), on='samhsa_id', indicator=True, how='outer').query('_merge=="left_only"').drop(columns=['_merge'])
+samhsa_matches = samhsa_matches[~samhsa_matches.npi.isin(samhsa_matches[['samhsa_id', 'npi']].drop_duplicates().groupby('npi').count().query('samhsa_id>1').reset_index().npi)]
+
+matches1 = samhsa_matches[['samhsa_id', 'npi']].drop_duplicates()
+remainders1 = sam.merge(samhsa_matches[['samhsa_id']].drop_duplicates(), how='outer', indicator=True).query('_merge!="both"').drop(columns='_merge')
+
+remainders1 = remainders1.query('middlename!=""').merge(new.query('pmname!=""'), left_on=['name','PractitionerType','State'], right_on=['name','practype','plocstatename']).sort_values('samhsa_id')
+matches2 = remainders1[~remainders1.samhsa_id.isin(remainders1[['samhsa_id', 'npi']].drop_duplicates().groupby('samhsa_id').count().query('npi>1').reset_index().samhsa_id)]
+matches2 = matches2[['samhsa_id', 'npi']].drop_duplicates()
+
+matches = matches1.append(matches2)
+
+dups = matches1.append(matches2)[['npi']][matches1.append(matches2)[['npi']].duplicated()]
+dd = s.samhsa.drop(columns='npi').merge(matches[matches.npi.isin(dups.npi)], on='samhsa_id').sort_values('npi').drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent','First name', 'Last name','NPI state','Date', 'Telephone', 'statecode', 'geoid', 'zcta5', 'zip', 'CurrentPatientLimit', 'NumberPatientsCertifiedFor', 'Index', 'DateGranted', 'Street2'])
+dd[['County']] = dd.County.str.upper()
+dd[['City']] = dd.City.str.upper()
+
+a1 = dd[~dd.npi.isin(dd[['npi','PractitionerType','Phone']].drop_duplicates()[dd[['npi','PractitionerType','Phone']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
+a2 = dd[~dd.npi.isin(dd[['npi','PractitionerType','County']].drop_duplicates()[dd[['npi','PractitionerType','County']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
+a3 = dd[~dd.npi.isin(dd[['npi','PractitionerType','City', 'State']].drop_duplicates()[dd[['npi','PractitionerType','City', 'State']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
+fine = a1.append(a2).append(a3).drop_duplicates()
+dups[~dups.npi.isin(fine.npi)]
+
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+remainders2 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
+
+zips = npi.loczip[['npi', 'ploczip']].drop_duplicates()
+zips['zip']=zips.ploczip.str[:5]
+zips = zips[['npi','zip']].drop_duplicates()
+new2=new.drop(columns='plocstatename').drop_duplicates().merge(zips)
 
 # samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
 #                               'First name', 'Last name', 'npi', 'NPI state',

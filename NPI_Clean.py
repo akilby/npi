@@ -76,6 +76,13 @@ class NPI(object):
         locstatename = pd.read_csv(os.path.join(src, 'plocstatename.csv'))
         self.locstatename = locstatename
 
+    def get_loczip(self):
+        if hasattr(self, 'loczip'):
+            return
+        src = self.src
+        loczip = pd.read_csv(os.path.join(src, 'ploczip.csv'))
+        self.loczip = loczip
+
     def get_cred(self, name_stub):
         src = self.src
         name_stub = 'p%s' % name_stub
@@ -118,9 +125,15 @@ class NPI(object):
         self.get_credentialoth()
         credential = self.credential
         credentialoth = self.credentialoth
-        self.credentials = credential.append(
+        credentials = credential.append(
             credentialoth.rename(
                 columns={'pcredentialoth': 'pcredential'})).drop_duplicates()
+        credentials['pcredential_stripped'] = (credentials.pcredential
+                                                          .str.replace('.', '')
+                                                          .str.replace(' ', '')
+                                                          .str.strip()
+                                                          .str.upper())
+        self.credentials = credentials
 
     def get_taxcode(self):
         taxcode = pd.read_csv(os.path.join(src, 'ptaxcode.csv'))
