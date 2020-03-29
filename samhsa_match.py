@@ -140,7 +140,7 @@ matches2 = matches2[['samhsa_id', 'npi']].drop_duplicates()
 
 matches = matches1.append(matches2)
 
-dups = matches1.append(matches2)[['npi']][matches1.append(matches2)[['npi']].duplicated()]
+dups = matches[['npi']][matches[['npi']].duplicated()]
 dd = s.samhsa.drop(columns='npi').merge(matches[matches.npi.isin(dups.npi)], on='samhsa_id').sort_values('npi').drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent','First name', 'Last name','NPI state','Date', 'Telephone', 'statecode', 'geoid', 'zcta5', 'zip', 'CurrentPatientLimit', 'NumberPatientsCertifiedFor', 'Index', 'DateGranted', 'Street2'])
 dd[['County']] = dd.County.str.upper()
 dd[['City']] = dd.City.str.upper()
@@ -157,7 +157,48 @@ remainders2 = sam.merge(matches, how='outer', indicator=True).query('_merge!="bo
 zips = npi.loczip[['npi', 'ploczip']].drop_duplicates()
 zips['zip']=zips.ploczip.str[:5]
 zips = zips[['npi','zip']].drop_duplicates()
-new2=new.drop(columns='plocstatename').drop_duplicates().merge(zips)
+new2 = new.drop(columns='plocstatename').drop_duplicates().merge(zips)
+
+sam2 = s.names.merge(s.samhsa[['PractitionerType', 'Zip', 'samhsa_id']].drop_duplicates())
+sam2['zip'] = sam2.Zip.str[:5]
+sam2 = sam2.drop(columns="Zip").drop_duplicates()
+sam2 = sam2.merge(remainders2[['samhsa_id']].drop_duplicates())
+new_matches = sam2.drop(columns=['firstname', 'middlename', 'lastname', 'Credential String']).merge(new2.drop(columns=['pfname','pmname','plname']), left_on=['name','PractitionerType','zip'], right_on=['name','practype','zip'])
+matches = matches.append(new_matches[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+
+remainders3 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
+
+
+new3 = new2[['npi','name','practype']].drop_duplicates()
+match4 = remainders3[['name','PractitionerType','samhsa_id']].drop_duplicates().merge(new3, left_on=['name','PractitionerType'], right_on=['name','practype'])
+match4 = match4[['samhsa_id', 'npi']].drop_duplicates()
+match4 = match4[~match4.samhsa_id.isin(match4[match4.samhsa_id.duplicated()].samhsa_id.drop_duplicates())]
+matches = matches.append(match4[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+remainders4 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
+
+
+new4 = new2.query('pmname!=""')[['npi','name','practype']].drop_duplicates()
+match5 = remainders4.query('middlename!=""')[['name','PractitionerType','samhsa_id']].drop_duplicates().merge(new4, left_on=['name','PractitionerType'], right_on=['name','practype'])
+match5 = match5[['samhsa_id', 'npi']].drop_duplicates()
+match5 = match5[~match5.samhsa_id.isin(match5[match5.samhsa_id.duplicated()].samhsa_id.drop_duplicates())]
+matches = matches.append(match5[['samhsa_id', 'npi']].drop_duplicates())
+dups = matches[['npi']][matches[['npi']].duplicated()]
+matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
+remainders5 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
+
+
+#these all actually look correct
+matches[matches.samhsa_id.isin(matches[matches.samhsa_id.duplicated()].samhsa_id)].head(60)
+
+
+# check for special characters
+"ELIZABETH MARIE O DAIR" == "ELIZABETH MARIE O'DAIR"
+"STEPHAINE JULIA HUCKER" == "STEPHAINE HUCKER"
+"ELIZABETH M LIDSTONE JAYANATH" == "ELIZABETH  MAUDE LIDSTONE-JAYANATH"
 
 # samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
 #                               'First name', 'Last name', 'npi', 'NPI state',
@@ -189,7 +230,7 @@ def credential_suffixes():
             'MBA', 'M.S.', 'PH.D', 'FACP', 'M.P.H', 'CNM',
             'NP-C', 'MR.', 'MDIV', 'FACEP', 'PLLC', 'M.A.', 'LLC', 'MR',
             'DNP', 'PHD.', 'FNP-C', 'MD.', 'CNP', 'J.D.', 'IV', 'F.A.P.A.',
-            'DR.', 'M.D,', 'DABPM', 'M,D.', 'MS.', 'FACOOG']
+            'DR.', 'M.D,', 'DABPM', 'M,D.', 'MS.', 'FACOOG', 'APRN']
 
     badl2 = (pd.read_csv('/work/akilby/npi/stubs_rev.csv')
                .rename(columns={'Unnamed: 2': 'flag'})
