@@ -9,8 +9,8 @@ src = '/work/akilby/npi/data/'
 class NPI(object):
     def __init__(self, src, npis=None):
         self.src = src
-        self.get_entity()
         self.npis = npis
+        self.get_entity()
 
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
