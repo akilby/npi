@@ -18,15 +18,14 @@ class NPI(object):
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
-        rfile = os.path.join(self.src, 'entity.csv')
-        entity = (pd.read_csv(rfile) if not isinstance(self.npis, pd.Series)
-                  else read_csv_npi(rfile, self.npis))
+        entity = read_csv_npi(os.path.join(self.src, 'entity.csv'), self.npis)
         entity = entity.dropna()
         entity['entity'] = entity.entity.astype("int")
         self.entity = entity[['npi', 'entity']].drop_duplicates()
 
     def get_name(self, name_stub):
-        name = pd.read_csv(os.path.join(self.src, 'p%s.csv' % name_stub))
+        name = read_csv_npi(os.path.join(self.src, 'p%s.csv' % name_stub),
+                            self.npis)
         name['p%s' % name_stub] = name['p%s' % name_stub].str.upper()
         name = name[['npi', 'p%s' % name_stub]].drop_duplicates()
         name = (name.merge(self.entity.query('entity==1'))
@@ -50,7 +49,8 @@ class NPI(object):
         self.lname = self.get_name('lname')
 
     def get_nameoth(self, name_stub):
-        nameoth = pd.read_csv(os.path.join(self.src, 'p%s.csv' % name_stub))
+        nameoth = read_csv_npi(os.path.join(self.src, 'p%s.csv' % name_stub),
+                               self.npis)
         nameoth = nameoth.dropna()
         nameoth['p%s' % name_stub] = nameoth['p%s' % name_stub].str.upper()
         nameoth = nameoth[['npi', 'p%s' % name_stub]].drop_duplicates()
@@ -74,49 +74,51 @@ class NPI(object):
     def get_locline1(self):
         if hasattr(self, 'locline1'):
             return
-        src = self.src
-        locline1 = pd.read_csv(os.path.join(src, 'locline1.csv'))
+        locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
+                                self.npis)
         self.locline1 = locline1
 
     def get_locline2(self):
         if hasattr(self, 'locline2'):
             return
-        src = self.src
-        locline2 = pd.read_csv(os.path.join(src, 'locline2.csv'))
+        locline2 = read_csv_npi(os.path.join(self.src, 'plocline2.csv'),
+                                self.npis)
         self.locline2 = locline2
 
     def get_loccityname(self):
         if hasattr(self, 'loccityname'):
             return
-        src = self.src
-        loccityname = pd.read_csv(os.path.join(src, 'ploccityname.csv'))
+        loccityname = read_csv_npi(os.path.join(self.src, 'ploccityname.csv'),
+                                   self.npis)
         self.loccityname = loccityname
 
     def get_locstatename(self):
         if hasattr(self, 'locstatename'):
             return
-        src = self.src
-        locstatename = pd.read_csv(os.path.join(src, 'plocstatename.csv'))
+        locstatename = read_csv_npi(
+            os.path.join(self.src, 'plocstatename.csv'), self.npis)
         self.locstatename = locstatename
 
     def get_loczip(self):
         if hasattr(self, 'loczip'):
             return
-        src = self.src
-        loczip = pd.read_csv(os.path.join(src, 'ploczip.csv'))
+        loczip = read_csv_npi(os.path.join(self.src, 'ploczip.csv'),
+                              self.npis)
+
         self.loczip = loczip
 
     def get_loctel(self):
         if hasattr(self, 'loczip'):
             return
-        src = self.src
-        loctel = pd.read_csv(os.path.join(src, 'ploctel.csv'))
+        loctel = read_csv_npi(os.path.join(self.src, 'ploctel.csv'),
+                              self.npis)
         self.loctel = loctel
 
     def get_cred(self, name_stub):
         src = self.src
         name_stub = 'p%s' % name_stub
-        credential = pd.read_csv(os.path.join(src, '%s.csv' % name_stub))
+        credential = read_csv_npi(os.path.join(src, '%s.csv' % name_stub),
+                                  self.npis)
         credential = credential.dropna()
         credential[name_stub] = credential[name_stub].str.upper()
         credential = credential[['npi', name_stub]].drop_duplicates()
@@ -166,7 +168,8 @@ class NPI(object):
         self.credentials = credentials
 
     def get_taxcode(self):
-        taxcode = pd.read_csv(os.path.join(src, 'ptaxcode.csv'))
+        taxcode = read_csv_npi(os.path.join(self.src, 'ptaxcode.csv'),
+                               self.npis)
         taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
         taxonomy_path = ('/home/akilby/Packages/claims_data/src/claims_data/'
                          'data/Provider Taxonomies - Labeled.csv')
@@ -444,9 +447,14 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
     return expanded_full
 
 
-def read_csv_npi(readfile, npis):
+def _read_csv_npi(readfile, npis):
     chunks = pd.read_csv(readfile, chunksize=500000)
     li = []
     for chunk in chunks:
         li.append(chunk[chunk['npi'].isin(npis)])
     return pd.concat(li)
+
+
+def read_csv_npi(rfile, npis):
+    return (pd.read_csv(rfile) if not isinstance(npis, pd.Series)
+            else _read_csv_npi(rfile, npis))
