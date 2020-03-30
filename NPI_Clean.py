@@ -19,7 +19,7 @@ class NPI(object):
         if hasattr(self, 'entity'):
             return
         rfile = os.path.join(self.src, 'entity.csv')
-        entity = (pd.read_csv(rfile) if not self.npis
+        entity = (pd.read_csv(rfile) if not isinstance(self.npis, pd.Series)
                   else read_csv_npi(rfile, self.npis))
         entity = entity.dropna()
         entity['entity'] = entity.entity.astype("int")
