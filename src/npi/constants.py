@@ -1,3 +1,5 @@
+import os
+
 NBER_PATH = 'https://data.nber.org/npi/byvar'
 RAW_DATA_DIR = '/work/akilby/npi/raw'
 DATA_DIR = '/work/akilby/npi/data'
@@ -394,3 +396,6 @@ USE_VAR_LIST = [x for x in
                 if (x in USE_VAR_LIST_DICT.keys()
                     and x in DTYPES.keys()
                     and x != 'npi')]
+
+VARS_NOT_MADE = [x for x in USE_VAR_LIST
+                 if '%s.csv' % x not in os.listdir(DATA_DIR)]
