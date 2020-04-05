@@ -5,11 +5,16 @@ import pandas as pd
 
 src = '/work/akilby/npi/data/'
 
+# entity initialization not fully incorporated
+# add deactivations
+# Add cacher
+
 
 class NPI(object):
-    def __init__(self, src, npis=None):
+    def __init__(self, src, npis=None, entities=[1, 2]):
         self.src = src
         self.npis = npis
+        self.entities = entities
         self.get_entity()
 
     def retrieve(self, thing):
@@ -18,35 +23,40 @@ class NPI(object):
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
+        from globalcache import c
         entity = read_csv_npi(os.path.join(self.src, 'entity.csv'), self.npis)
         entity = entity.dropna()
         entity['entity'] = entity.entity.astype("int")
-        self.entity = entity[['npi', 'entity']].drop_duplicates()
+        entity = entity[['npi', 'entity']].drop_duplicates()
+        self.entity = entity
 
     def get_name(self, name_stub):
-        name = read_csv_npi(os.path.join(self.src, 'p%s.csv' % name_stub),
+        name = read_csv_npi(os.path.join(self.src, '%s.csv' % name_stub),
                             self.npis)
-        name['p%s' % name_stub] = name['p%s' % name_stub].str.upper()
-        name = name[['npi', 'p%s' % name_stub]].drop_duplicates()
+        name['%s' % name_stub] = name['%s' % name_stub].str.upper()
+        name = name[['npi', '%s' % name_stub]].drop_duplicates()
+        assert name.dropna().merge(self.entity).entity.value_counts().index == [1]
+        if self.entities == [1, 2]:
+            print('%s is only for entity type 1')
         name = (name.merge(self.entity.query('entity==1'))
                     .drop(columns=['entity']))
-        name = purge_nulls(name, 'p%s' % name_stub, ['npi'])
+        name = purge_nulls(name, '%s' % name_stub, ['npi'])
         return name
 
-    def get_fname(self):
-        if hasattr(self, 'fname'):
+    def get_pfname(self):
+        if hasattr(self, 'pfname') or self.entities == 2:
             return
-        self.fname = self.get_name('fname')
+        self.fname = self.get_name('pfname')
 
-    def get_mname(self):
-        if hasattr(self, 'mname'):
+    def get_pmname(self):
+        if hasattr(self, 'pmname') or self.entities == 2:
             return
-        self.mname = self.get_name('mname')
+        self.mname = self.get_name('pmname')
 
-    def get_lname(self):
-        if hasattr(self, 'lname'):
+    def get_plname(self):
+        if hasattr(self, 'plname') or self.entities == 2:
             return
-        self.lname = self.get_name('lname')
+        self.lname = self.get_name('plname')
 
     def get_nameoth(self, name_stub):
         nameoth = read_csv_npi(os.path.join(self.src, 'p%s.csv' % name_stub),
@@ -76,6 +86,7 @@ class NPI(object):
             return
         locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
                                 self.npis)
+        locline1['plocline1'] = locline1['plocline1'].str.upper()
         self.locline1 = locline1
 
     def get_locline2(self):
@@ -83,6 +94,7 @@ class NPI(object):
             return
         locline2 = read_csv_npi(os.path.join(self.src, 'plocline2.csv'),
                                 self.npis)
+        locline2['plocline2'] = locline2['plocline2'].str.upper()
         self.locline2 = locline2
 
     def get_loccityname(self):
@@ -90,6 +102,7 @@ class NPI(object):
             return
         loccityname = read_csv_npi(os.path.join(self.src, 'ploccityname.csv'),
                                    self.npis)
+        loccityname['ploccityname'] = loccityname['ploccityname'].str.upper()
         self.loccityname = loccityname
 
     def get_locstatename(self):
@@ -97,6 +110,8 @@ class NPI(object):
             return
         locstatename = read_csv_npi(
             os.path.join(self.src, 'plocstatename.csv'), self.npis)
+        stub = 'plocstatename'
+        locstatename[stub] = locstatename[stub].str.upper()
         self.locstatename = locstatename
 
     def get_loczip(self):
@@ -108,10 +123,17 @@ class NPI(object):
         self.loczip = loczip
 
     def get_loctel(self):
-        if hasattr(self, 'loczip'):
+        if hasattr(self, 'loctel'):
             return
         loctel = read_csv_npi(os.path.join(self.src, 'ploctel.csv'),
                               self.npis)
+        loctel['ploctel'] = (loctel.ploctel
+                                   .astype('str')
+                                   .str.split('.', expand=True)[0])
+        loctel['ploctel'] = (loctel.ploctel.str.replace('-', '')
+                                           .str.replace('(', '')
+                                           .str.replace(')', '')
+                                           .str.replace(' ', ''))
         self.loctel = loctel
 
     def get_cred(self, name_stub):
@@ -418,6 +440,9 @@ def _in_multi(x, list_objs): return any([_in(x, obj) for obj in list_objs])
 
 
 def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
+    '''
+    For custom fuzzy matching
+    '''
     # one middle initial
     df['minit'] = df[middlename].str[:1]
     # no middle name

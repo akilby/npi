@@ -88,6 +88,10 @@ USE_VAR_LIST_DICT = {
     'porgnameoth': 'Provider Other Organization Name',
     'porgnameothcode': 'Provider Other Organization Name Type Code',
     'pfnameoth': 'Provider Other First Name',
+    'npideactdate': 'NPI Deactivation Date',
+    'npireactdate': 'NPI Reactivation Date',
+    'orgsubpart': 'Is Organization Subpart',
+    'parent_org_lbn': 'Parent Organization LBN',
     'PLICNUM': ['Provider License Number_1',
                 'Provider License Number_2',
                 'Provider License Number_3',
@@ -378,7 +382,11 @@ DTYPES = {
     'OTHPID': 'string',
     'OTHPIDISS': 'string',
     'OTHPIDST': 'string',
-    'OTHPIDTY': "Int64"
+    'OTHPIDTY': "Int64",
+    'npideactdate': 'datetime64[ns]',
+    'npireactdate': 'datetime64[ns]',
+    'orgsubpart': 'string',
+    'parent_org_lbn': 'string',
 }
 
 USE_VAR_LIST = [x for x in

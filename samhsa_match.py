@@ -273,7 +273,7 @@ usable_data = usable_data.drop_duplicates().reset_index(drop=True)
 usable_data['Date']=usable_data['DateGranted']
 usable_data.loc[usable_data['Date'].isnull(), 'Date'] = usable_data['DateLastCertified']
 
-usable_data.to_csv('/work/akilby/npi/samhsa_npi_usable_data.csv')
+usable_data.to_csv('/work/akilby/npi/samhsa_npi_usable_data.csv', index=False)
 
 #these all actually look correct
 matches[matches.samhsa_id.isin(matches[matches.samhsa_id.duplicated()].samhsa_id)].head(60)
