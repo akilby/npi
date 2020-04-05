@@ -6,7 +6,7 @@ from pprint import pprint
 import pandas as pd
 from constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
                        USE_VAR_LIST_DICT_REVERSE)
-from NPI_Data_Download import nppes_month_list
+from download import nppes_month_list
 from utils import month_name_to_month_num
 
 
@@ -22,13 +22,50 @@ def get_filepaths_from_dissemination_zips(folder):
     folders = [x for x
                in glob.glob(zip_paths)
                if not x.endswith('.zip')]
+    folders = [x for x in folders if 'Weekly' not in x]
     possbl = list(set(glob.glob(zip_paths + '/**/*npidata_*', recursive=True)))
+    possbl = [x for x in possbl if 'Weekly' not in x]
     paths = {(x.partition(stub)[2].split('/')[0].split('_')[1],
               str(month_name_to_month_num(
                 x.partition(stub)[2].split('/')[0].split('_')[0]))): x
              for x in possbl if 'eader' not in x}
     assert len(folders) == len(paths)
     return paths
+
+
+def get_weekly_dissemination_zips(folder):
+    '''
+    Each weekly update folder contains a large / bulk data file of the format
+    npidata_pfile_20200323-20200329, representing the week covered
+    '''
+    zip_paths = os.path.join(folder, 'NPPES_Data_Dissemination*')
+    stub = os.path.join(folder, 'NPPES_Data_Dissemination_')
+    folders = [x for x
+               in glob.glob(zip_paths)
+               if not x.endswith('.zip')]
+    folders = [x for x in folders if 'Weekly' in x]
+    possbl = list(set(glob.glob(zip_paths + '/**/*npidata_*', recursive=True)))
+    possbl = [x for x in possbl if 'Weekly' in x]
+    paths = {(x.partition(stub)[2].split('/')[0].split('_')[0],
+             x.partition(stub)[2].split('/')[0].split('_')[1]): x
+             for x in possbl if 'eader' not in x}
+    assert len(folders) == len(paths)
+    return paths
+
+
+def which_weekly_dissemination_zips_are_updates(folder):
+    """
+    """
+    last_monthly = max([pd.to_datetime(val.split('-')[1]
+                                          .split('.csv')[0]
+                                          .replace(' Jan 2013/', '')
+                                          .replace('npidata_', ''))
+                        for key, val in
+                        get_filepaths_from_dissemination_zips(folder).items()])
+    updates = [(x, val) for x, val
+               in get_weekly_dissemination_zips(folder).items()
+               if pd.to_datetime(x[1]) > last_monthly]
+    return updates
 
 
 def get_secondary_loc_filepaths_from_dissemination_zips(folder):
@@ -156,20 +193,47 @@ def read_and_process_df(folder, year, month, variable):
     '''
     file_path = locate_file(folder, '%s' % year, '%s' % month, variable)
     if file_path:
-        is_dissem_file = len(file_path.split('/')) > 6
-        is_dta_file = os.path.splitext(file_path)[1] == '.dta'
-        collist, d_use = column_details(variable, is_dissem_file, is_dta_file)
-        df = (pd.read_csv(file_path, usecols=collist, dtype=d_use)
-              if file_path.endswith('.csv')
-              else pd.read_stata(file_path, columns=collist))
-        if (not is_dissem_file
-                and variable not in df.columns
-                and variable.lower() in df.columns):
-            df = df.rename(columns={variable.lower(): variable})
-        df = convert_dtypes(df)
-        df = reformat(df, variable, is_dissem_file)
+        df = process_filepath_to_df(file_path, variable)
         df['month'] = pd.to_datetime('%s-%s' % (year, month))
         return df
+
+
+def read_and_process_weekly_updates(folder, variable):
+    """
+    """
+    filepaths = which_weekly_dissemination_zips_are_updates(folder)
+    updates = pd.concat(
+        [process_filepath_to_df(f[1], variable).assign(
+            week=pd.to_datetime(f[0][0]))
+         for f in filepaths])
+    updates['month'] = (pd.to_datetime(updates.week.dt.year.astype(str)
+                        + '-'
+                        + updates.week.dt.month.astype(str) + '-' + '1'))
+    updates = (updates.dropna()
+                      .groupby(['npi', 'month'])
+                      .max()
+                      .reset_index()
+                      .merge(updates)
+                      .drop(columns='week'))
+    return updates
+
+
+def process_filepath_to_df(file_path, variable):
+    """
+    """
+    is_dissem_file = len(file_path.split('/')) > 6
+    is_dta_file = os.path.splitext(file_path)[1] == '.dta'
+    collist, d_use = column_details(variable, is_dissem_file, is_dta_file)
+    df = (pd.read_csv(file_path, usecols=collist, dtype=d_use)
+          if file_path.endswith('.csv')
+          else pd.read_stata(file_path, columns=collist))
+    if (not is_dissem_file
+            and variable not in df.columns
+            and variable.lower() in df.columns):
+        df = df.rename(columns={variable.lower(): variable})
+    df = convert_dtypes(df)
+    df = reformat(df, variable, is_dissem_file)
+    return df
 
 
 def reformat(df, variable, is_dissem_file):
@@ -188,7 +252,7 @@ def reformat(df, variable, is_dissem_file):
     return df
 
 
-def process_variable(folder, variable, searchlist):
+def process_variable(folder, variable, searchlist, final_weekly_updates=True):
     '''
     '''
     # Should delete NPPES_Data_Dissemination_March_2011 because it's weird
@@ -204,13 +268,20 @@ def process_variable(folder, variable, searchlist):
         else:
             df = read_and_process_df(folder, year, month, variable)
         df_list.append(df)
-    return pd.concat(df_list, axis=0) if df_list else None
+    df = pd.concat(df_list, axis=0) if df_list else None
+    if df_list and final_weekly_updates:
+        u = read_and_process_weekly_updates(folder, variable)
+        df = df.merge(u, on=['npi', 'month'], how='outer', indicator=True)
+        df.loc[df._merge == "right_only",
+               '%s_x' % variable] = df['%s_y' % variable]
+        df.loc[df._merge == "both", '%s_x' % variable] = df['%s_y' % variable]
+        df = (df.drop(columns=['_merge', '%s_y' % variable])
+                .rename(columns={'%s_x' % variable: variable}))
+        assert df[['npi', 'month']].drop_duplicates().shape[0] == df.shape[0]
+    return df
 
 
-def main():
-    variable = sys.argv[1]
-    update = sys.argv[2] if len(sys.argv) > 2 else False
-    update = update if (update == 'True' or update == 'Force') else False
+def main_process_variable(variable, update):
     if not update:
         df = process_variable(RAW_DATA_DIR, variable, nppes_month_list())
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
@@ -222,30 +293,29 @@ def main():
         last_month = max(list(df.month.value_counts().index))
         searchlist = [x for x in nppes_month_list() if
                       (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
-                       > pd.to_datetime(last_month))]
-        print('months->', searchlist)
+                       >= pd.to_datetime(last_month) - pd.DateOffset(months=6))
+                      ]
+        print('updating (destroying and remaking) months->', searchlist)
         if searchlist != [] or update == 'Force':
             df2 = process_variable(RAW_DATA_DIR, variable, searchlist)
-            df = pd.concat([df, df2], axis=0)
+            # df = pd.concat([df, df2], axis=0)
+            dim1 = df.loc[df.month >= df2.month.min()].shape[0]
+            dim2 = df.loc[df.month >= df2.month.min()].merge(
+                df2, on=['npi', 'month']).shape[0]
+            assert dim1 == dim2
+            df = df.loc[df.month < df2.month.min()].append(df2)
+            assert (df[['npi', 'month']].drop_duplicates().shape[0]
+                    == df.shape[0])
             df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                       index=False)
 
 
+def main():
+    variable = sys.argv[1]
+    update = sys.argv[2] if len(sys.argv) > 2 else False
+    update = update if (update == 'True' or update == 'Force') else False
+    main_process_variable(variable, update)
+
+
 if __name__ == '__main__':
     main()
-
-
-# Note: need to prepend 'p' to these variables
-
-# query_dataset = 'taxcode'
-# query_string = 'NPI=="390200000X"'
-# output_variables = ['locline1', 'locline2', 'loccityname',
-#                     'locstatename', 'loczip']
-
-
-# def query_npi(query_dataset, query_string, output_variables):
-#     # 1. read in appropriate dataset
-#     # 2. do the query on the data, get out all the NPI-months that match
-#     # 3. extract from each dataset for the output varables, for each NPI
-#     df.query(query_string)
-#     pass

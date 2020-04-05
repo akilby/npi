@@ -3,6 +3,10 @@ Code written collaboratively with @amin.p and @akilby
 
 Downloads all NBER npi data for years in yearlist and months in monthslist
 and variables in USE_VAR_LIST
+
+Downloads all master dissemination files from the NBER and CMS
+
+Downloads the weekly updates
 """
 
 import calendar
@@ -14,6 +18,7 @@ import zlib
 from pprint import pprint
 
 import pandas as pd
+import requests
 import wget
 from constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
 
@@ -28,6 +33,17 @@ def nppes_month_list():
             for y in range(1, 13)
             if not (x == 2007 and y < 11)
             and not (x == cyear and y > cmonth)]
+
+
+def nppes_weekly_update_list():
+    """
+    """
+    cms = 'https://download.cms.gov/nppes'
+    return [cms +
+            x.split('href=".')[1].split('.zip')[0] + '.zip'
+            for x in
+            requests.get(cms + '/NPI_Files.html').text.splitlines()
+            if '_Weekly.zip' in x]
 
 
 def wget_checkfirst(url, to_dir, nondestructive=True):
@@ -138,10 +154,16 @@ def main():
                    for x in missing_months}
     pprint([key for key, val in result_list.items() if not val[0]])
 
+    # Download weekly updates
+    weeklies = {x: wget_checkfirst(x, RAW_DATA_DIR)
+                for x in nppes_weekly_update_list()}
+
     # Unzip large data dissemination files
-    zipfiles = [os.path.join(RAW_DATA_DIR, wget.detect_filename(val[1]))
-                for key, val in result_list.items() if val[0]]
-    [unzip(z, os.path.splitext(z)[0]) for z in zipfiles]
+    zipfiles1 = [os.path.join(RAW_DATA_DIR, wget.detect_filename(val[1]))
+                 for key, val in result_list.items() if val[0]]
+    zipfiles2 = [os.path.join(RAW_DATA_DIR, wget.detect_filename(key))
+                 for key, val in weeklies.items() if val]
+    [unzip(z, os.path.splitext(z)[0]) for z in zipfiles1 + zipfiles2]
 
 
 if __name__ == '__main__':
