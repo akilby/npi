@@ -24,8 +24,8 @@ class NPI(object):
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
-        # from globalcache import c
-        self.entity = entity(self.src, self.npis)
+        from .utils.globalcache import c
+        self.entity = c.entity(self.src, self.npis)
 
     def get_name(self, name_stub):
         name = read_csv_npi(os.path.join(self.src, '%s.csv' % name_stub),
