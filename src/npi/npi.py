@@ -1,3 +1,10 @@
+"""
+Notes: for names, and fullnames, only for entity=1
+Also, stored at the individual, not individual-month level
+
+
+"""
+
 import os
 import re
 
@@ -25,101 +32,104 @@ class NPI(object):
         if hasattr(self, 'entity'):
             return
         from .utils.globalcache import c
-        self.entity = c.entity(self.src, self.npis)
-
-    def get_name(self, name_stub):
-        name = read_csv_npi(os.path.join(self.src, '%s.csv' % name_stub),
-                            self.npis)
-        name['%s' % name_stub] = name['%s' % name_stub].str.upper()
-        name = name[['npi', '%s' % name_stub]].drop_duplicates()
-        assert name.dropna().merge(self.entity).entity.value_counts().index == [1]
-        if self.entities == [1, 2]:
-            print('%s is only for entity type 1')
-        name = (name.merge(self.entity.query('entity==1'))
-                    .drop(columns=['entity']))
-        name = purge_nulls(name, '%s' % name_stub, ['npi'])
-        return name
+        self.entity = c.get_entity(self.src, self.npis)
 
     def get_pfname(self):
         if hasattr(self, 'pfname') or self.entities == 2:
             return
-        self.fname = self.get_name('pfname')
+        from .utils.globalcache import c
+        self.pfname = c.get_name(
+            self.src, self.npis, self.entity, self.entities, 'pfname')
 
     def get_pmname(self):
         if hasattr(self, 'pmname') or self.entities == 2:
             return
-        self.mname = self.get_name('pmname')
+        from .utils.globalcache import c
+        self.pmname = c.get_name(
+            self.src, self.npis, self.entity, self.entities, 'pmname')
 
     def get_plname(self):
         if hasattr(self, 'plname') or self.entities == 2:
             return
-        self.lname = self.get_name('plname')
+        from .utils.globalcache import c
+        self.plname = c.get_name(
+            self.src, self.npis, self.entity, self.entities, 'plname')
 
-    def get_nameoth(self, name_stub):
-        nameoth = read_csv_npi(os.path.join(self.src, 'p%s.csv' % name_stub),
-                               self.npis)
-        nameoth = nameoth.dropna()
-        nameoth['p%s' % name_stub] = nameoth['p%s' % name_stub].str.upper()
-        nameoth = nameoth[['npi', 'p%s' % name_stub]].drop_duplicates()
-        return nameoth
-
-    def get_fnameoth(self):
-        if hasattr(self, 'fnameoth'):
+    def get_pfnameoth(self):
+        if hasattr(self, 'pfnameoth') or self.entities == 2:
             return
-        self.fnameoth = self.get_nameoth('fnameoth')
+        from .utils.globalcache import c
+        self.pfnameoth = c.get_nameoth(
+            self.src, self.npis, self.entity, self.entities, 'pfnameoth')
 
-    def get_mnameoth(self):
-        if hasattr(self, 'mnameoth'):
+    def get_pmnameoth(self):
+        if hasattr(self, 'pmnameoth') or self.entities == 2:
             return
-        self.mnameoth = self.get_nameoth('mnameoth')
+        from .utils.globalcache import c
+        self.pmnameoth = c.get_nameoth(
+            self.src, self.npis, self.entity, self.entities, 'pmnameoth')
 
-    def get_lnameoth(self):
-        if hasattr(self, 'lnameoth'):
+    def get_plnameoth(self):
+        if hasattr(self, 'plnameoth') or self.entities == 2:
             return
-        self.lnameoth = self.get_nameoth('lnameoth')
+        from .utils.globalcache import c
+        self.plnameoth = c.get_nameoth(
+            self.src, self.npis, self.entity, self.entities, 'plnameoth')
 
-    def get_locline1(self):
-        if hasattr(self, 'locline1'):
+    def get_plocline1(self):
+        # deal with entity selection
+        # deal with deactivation
+        if hasattr(self, 'plocline1'):
             return
         locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
                                 self.npis)
         locline1['plocline1'] = locline1['plocline1'].str.upper()
-        self.locline1 = locline1
+        self.plocline1 = locline1
 
-    def get_locline2(self):
-        if hasattr(self, 'locline2'):
+    def get_plocline2(self):
+        # deal with entity selection
+        # deal with deactivation
+        if hasattr(self, 'plocline2'):
             return
         locline2 = read_csv_npi(os.path.join(self.src, 'plocline2.csv'),
                                 self.npis)
         locline2['plocline2'] = locline2['plocline2'].str.upper()
-        self.locline2 = locline2
+        self.plocline2 = locline2
 
-    def get_loccityname(self):
-        if hasattr(self, 'loccityname'):
+    def get_ploccityname(self):
+        # deal with entity selection
+        # deal with deactivation
+        if hasattr(self, 'ploccityname'):
             return
         loccityname = read_csv_npi(os.path.join(self.src, 'ploccityname.csv'),
                                    self.npis)
         loccityname['ploccityname'] = loccityname['ploccityname'].str.upper()
-        self.loccityname = loccityname
+        self.ploccityname = loccityname
 
-    def get_locstatename(self):
-        if hasattr(self, 'locstatename'):
+    def get_plocstatename(self):
+        # deal with entity selection
+        # deal with deactivation
+        if hasattr(self, 'plocstatename'):
             return
         locstatename = read_csv_npi(
             os.path.join(self.src, 'plocstatename.csv'), self.npis)
         stub = 'plocstatename'
         locstatename[stub] = locstatename[stub].str.upper()
-        self.locstatename = locstatename
+        self.plocstatename = locstatename
 
-    def get_loczip(self):
-        if hasattr(self, 'loczip'):
+    def get_ploczip(self):
+        # deal with entity selection
+        # deal with deactivation
+        if hasattr(self, 'ploczip'):
             return
         loczip = read_csv_npi(os.path.join(self.src, 'ploczip.csv'),
                               self.npis)
 
-        self.loczip = loczip
+        self.ploczip = loczip
 
-    def get_loctel(self):
+    def get_ploctel(self):
+        # deal with entity selection
+        # deal with deactivation
         if hasattr(self, 'loctel'):
             return
         loctel = read_csv_npi(os.path.join(self.src, 'ploctel.csv'),
@@ -131,11 +141,12 @@ class NPI(object):
                                            .str.replace('(', '')
                                            .str.replace(')', '')
                                            .str.replace(' ', ''))
-        self.loctel = loctel
+        self.ploctel = loctel
 
     def get_cred(self, name_stub):
+        # Entity selection or is this only for entity=1
+        # At the individual level
         src = self.src
-        name_stub = 'p%s' % name_stub
         credential = read_csv_npi(os.path.join(src, '%s.csv' % name_stub),
                                   self.npis)
         credential = credential.dropna()
@@ -159,23 +170,24 @@ class NPI(object):
         credential = credential.drop_duplicates()
         return credential
 
-    def get_credential(self):
-        if hasattr(self, 'credential'):
+    def get_pcredential(self):
+        # return if only orgs?
+        if hasattr(self, 'pcredential'):
             return
-        self.credential = self.get_nameoth('credential')
+        self.pcredential = self.get_nameoth('pcredential')
 
-    def get_credentialoth(self):
-        if hasattr(self, 'credentialoth'):
+    def get_pcredentialoth(self):
+        if hasattr(self, 'pcredentialoth'):
             return
-        self.credentialoth = self.get_nameoth('credentialoth')
+        self.pcredentialoth = self.get_nameoth('pcredentialoth')
 
     def get_credentials(self):
         if hasattr(self, 'credentials'):
             return
-        self.get_credential()
-        self.get_credentialoth()
-        credential = self.credential
-        credentialoth = self.credentialoth
+        self.get_pcredential()
+        self.get_pcredentialoth()
+        credential = self.pcredential
+        credentialoth = self.pcredentialoth
         credentials = credential.append(
             credentialoth.rename(
                 columns={'pcredentialoth': 'pcredential'})).drop_duplicates()
@@ -186,7 +198,9 @@ class NPI(object):
                                                           .str.upper())
         self.credentials = credentials
 
-    def get_taxcode(self):
+    def get_ptaxcode(self):
+        # Entity selection
+        # At the individual level
         taxcode = read_csv_npi(os.path.join(self.src, 'ptaxcode.csv'),
                                self.npis)
         taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
@@ -209,19 +223,19 @@ class NPI(object):
         taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'NP'
         taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
         taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
-        taxcode = (taxcode.merge(self.entity.query('entity==1'))
-                          .drop(columns=['entity']))
+        # taxcode = (taxcode.merge(self.entity.query('entity==1'))
+        #                   .drop(columns=['entity']))
         self.taxcode = taxcode
 
     def get_fullnames(self):
         if hasattr(self, 'fullnames'):
             return
-        self.get_fname()
-        self.get_mname()
-        self.get_lname()
-        self.get_fnameoth()
-        self.get_mnameoth()
-        self.get_lnameoth()
+        self.get_pfname()
+        self.get_pmname()
+        self.get_plname()
+        self.get_pfnameoth()
+        self.get_pmnameoth()
+        self.get_plnameoth()
 
         name_list = ['pfname', 'pmname', 'plname']
         oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth']
@@ -482,9 +496,47 @@ def read_csv_npi(rfile, npis):
             else _read_csv_npi(rfile, npis))
 
 
-def entity(src, npis):
+def get_entity(src, npis):
+    """
+    Returns NPI entity type across all NPIs (invariant over time)
+    """
     entity = read_csv_npi(os.path.join(src, 'entity.csv'), npis)
     entity = entity.dropna()
     entity['entity'] = entity.entity.astype("int")
     entity = entity[['npi', 'entity']].drop_duplicates()
     return entity
+
+
+def get_name(src, npis, entity, entities, name_stub):
+    """
+    Retrieves pfname, pmname, and plname
+    Only for entity type 1
+    Returns non-temporal data; all names associated with a given NPI
+    """
+    name = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
+    name['%s' % name_stub] = name[name_stub].str.upper()
+    name = name[['npi', name_stub]].drop_duplicates()
+    assert name.dropna().merge(entity).entity.value_counts().index == [1]
+    if entities == [1, 2]:
+        print('Warning: %s is only returned for entity type 1' % name_stub)
+    name = (name.merge(entity.query('entity==1')).drop(columns=['entity']))
+    name = purge_nulls(name, '%s' % name_stub, ['npi'])
+    return name
+
+
+def get_nameoth(src, npis, entity, entities, name_stub):
+    """
+    Retrieves pfnameoth, pmnameoth, and plnameoth
+    Only for entity type 1
+    Returns non-temporal data; all names associated with a given NPI
+    """
+    nameoth = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
+    assert nameoth.dropna().merge(entity).entity.value_counts().index == [1]
+    if entities == [1, 2]:
+        print('%s is only for entity type 1' % name_stub)
+    nameoth = nameoth.dropna()
+    nameoth = (nameoth.merge(entity.query('entity==1'))
+                      .drop(columns=['entity']))
+    nameoth[name_stub] = nameoth[name_stub].str.upper()
+    nameoth = nameoth[['npi', name_stub]].drop_duplicates()
+    return nameoth
