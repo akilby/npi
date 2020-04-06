@@ -145,8 +145,12 @@ def update_db(raw_folder, med_school_partials_folder, save=None):
                           for x
                           in glob.glob(os.path.join(raw_folder, '*.txt'))])))
     fi = [x.split('_')[1] for x in fi]
-    new_npis = pd.DataFrame(dict(npi=fi)).astype(int).drop_duplicates().merge(
-        df, how='left', indicator=True).query('_merge=="left_only"')
+    new_npis = (pd.DataFrame(dict(npi=fi))
+                  .query('npi!=""')
+                  .astype(int)
+                  .drop_duplicates()
+                  .merge(df, how='left', indicator=True)
+                  .query('_merge=="left_only"'))
     print('new NPIs', len(new_npis.npi))
     df_long, not_found = retrieve_npis(new_npis.npi)
     if not df_long.empty:
