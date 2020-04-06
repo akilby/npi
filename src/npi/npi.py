@@ -38,43 +38,40 @@ class NPI(object):
         if hasattr(self, 'pfname') or self.entities == 2:
             return
         from .utils.globalcache import c
-        self.pfname = c.get_name(
-            self.src, self.npis, self.entity, self.entities, 'pfname')
+        self.pfname = c.get_name(self.src, self.npis, self.entity, 'pfname')
 
     def get_pmname(self):
         if hasattr(self, 'pmname') or self.entities == 2:
             return
         from .utils.globalcache import c
-        self.pmname = c.get_name(
-            self.src, self.npis, self.entity, self.entities, 'pmname')
+        self.pmname = c.get_name(self.src, self.npis, self.entity, 'pmname')
 
     def get_plname(self):
         if hasattr(self, 'plname') or self.entities == 2:
             return
         from .utils.globalcache import c
-        self.plname = c.get_name(
-            self.src, self.npis, self.entity, self.entities, 'plname')
+        self.plname = c.get_name(self.src, self.npis, self.entity, 'plname')
 
     def get_pfnameoth(self):
         if hasattr(self, 'pfnameoth') or self.entities == 2:
             return
         from .utils.globalcache import c
         self.pfnameoth = c.get_nameoth(
-            self.src, self.npis, self.entity, self.entities, 'pfnameoth')
+            self.src, self.npis, self.entity, 'pfnameoth')
 
     def get_pmnameoth(self):
         if hasattr(self, 'pmnameoth') or self.entities == 2:
             return
         from .utils.globalcache import c
         self.pmnameoth = c.get_nameoth(
-            self.src, self.npis, self.entity, self.entities, 'pmnameoth')
+            self.src, self.npis, self.entity, 'pmnameoth')
 
     def get_plnameoth(self):
         if hasattr(self, 'plnameoth') or self.entities == 2:
             return
         from .utils.globalcache import c
         self.plnameoth = c.get_nameoth(
-            self.src, self.npis, self.entity, self.entities, 'plnameoth')
+            self.src, self.npis, self.entity, 'plnameoth')
 
     def get_plocline1(self):
         # deal with entity selection
