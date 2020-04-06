@@ -126,7 +126,7 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
         return pd.DataFrame(), not_found
 
 
-def update_db(raw_folder, med_school_partials_folder):
+def update_db(raw_folder, med_school_partials_folder, save=None):
     '''
     Pulls updates from the raw data folder and saves to a
     med school partial file. then concatenates all partial
@@ -163,4 +163,6 @@ def update_db(raw_folder, med_school_partials_folder):
     for pat in glob.glob(gpath):
         df_list.append(pd.read_csv(pat))
     updated = pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
+    if save:
+        updated.to_csv(save)
     return updated, not_found
