@@ -507,7 +507,7 @@ def get_entity(src, npis):
     return entity
 
 
-def get_name(src, npis, entity, entities, name_stub):
+def get_name(src, npis, entity, name_stub):
     """
     Retrieves pfname, pmname, and plname
     Only for entity type 1
@@ -517,14 +517,12 @@ def get_name(src, npis, entity, entities, name_stub):
     name['%s' % name_stub] = name[name_stub].str.upper()
     name = name[['npi', name_stub]].drop_duplicates()
     assert name.dropna().merge(entity).entity.value_counts().index == [1]
-    if entities == [1, 2]:
-        print('Warning: %s is only returned for entity type 1' % name_stub)
     name = (name.merge(entity.query('entity==1')).drop(columns=['entity']))
     name = purge_nulls(name, '%s' % name_stub, ['npi'])
     return name
 
 
-def get_nameoth(src, npis, entity, entities, name_stub):
+def get_nameoth(src, npis, entity, name_stub):
     """
     Retrieves pfnameoth, pmnameoth, and plnameoth
     Only for entity type 1
@@ -532,8 +530,6 @@ def get_nameoth(src, npis, entity, entities, name_stub):
     """
     nameoth = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
     assert nameoth.dropna().merge(entity).entity.value_counts().index == [1]
-    if entities == [1, 2]:
-        print('%s is only for entity type 1' % name_stub)
     nameoth = nameoth.dropna()
     nameoth = (nameoth.merge(entity.query('entity==1'))
                       .drop(columns=['entity']))
