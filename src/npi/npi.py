@@ -8,6 +8,7 @@ src = '/work/akilby/npi/data/'
 # entity initialization not fully incorporated
 # add deactivations
 # Add cacher
+# fix p stubs
 
 
 class NPI(object):
@@ -23,12 +24,8 @@ class NPI(object):
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
-        from globalcache import c
-        entity = read_csv_npi(os.path.join(self.src, 'entity.csv'), self.npis)
-        entity = entity.dropna()
-        entity['entity'] = entity.entity.astype("int")
-        entity = entity[['npi', 'entity']].drop_duplicates()
-        self.entity = entity
+        # from globalcache import c
+        self.entity = entity(self.src, self.npis)
 
     def get_name(self, name_stub):
         name = read_csv_npi(os.path.join(self.src, '%s.csv' % name_stub),
@@ -483,3 +480,11 @@ def _read_csv_npi(readfile, npis):
 def read_csv_npi(rfile, npis):
     return (pd.read_csv(rfile) if not isinstance(npis, pd.Series)
             else _read_csv_npi(rfile, npis))
+
+
+def entity(src, npis):
+    entity = read_csv_npi(os.path.join(src, 'entity.csv'), npis)
+    entity = entity.dropna()
+    entity['entity'] = entity.entity.astype("int")
+    entity = entity[['npi', 'entity']].drop_duplicates()
+    return entity
