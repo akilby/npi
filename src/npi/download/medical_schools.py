@@ -168,5 +168,5 @@ def update_db(raw_folder, med_school_partials_folder, save=None):
         df_list.append(pd.read_csv(pat))
     updated = pd.concat(df_list).drop(columns=['Unnamed: 0']).drop_duplicates()
     if save:
-        updated.to_csv(save)
+        updated.to_csv(save, index=False)
     return updated, not_found
