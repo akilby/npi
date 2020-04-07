@@ -196,33 +196,17 @@ class NPI(object):
         self.credentials = credentials
 
     def get_ptaxcode(self):
-        # Entity selection
-        # At the individual level
-        taxcode = read_csv_npi(os.path.join(self.src, 'ptaxcode.csv'),
-                               self.npis)
-        taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
-        taxonomy_path = ('/home/akilby/Packages/claims_data/src/claims_data/'
-                         'data/Provider Taxonomies - Labeled.csv')
-        tax = pd.read_csv(taxonomy_path)
-        tax.columns = ['EntityType', 'Type', 'Classification',
-                       'Specialization', 'TaxonomyCode']
-        pa = (tax.query('Classification == "Physician Assistant"')
-                 .TaxonomyCode
-                 .tolist())
-        np = (tax.query('Classification == "Nurse Practitioner"')
-                 .TaxonomyCode
-                 .tolist())
-        mddo = (tax.query('Type=="Allopathic & Osteopathic Physicians"')
-                   .TaxonomyCode
-                   .tolist())
-        student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
-        taxcode.loc[taxcode.ptaxcode.isin(pa), 'cat'] = 'PA'
-        taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'NP'
-        taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
-        taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
-        # taxcode = (taxcode.merge(self.entity.query('entity==1'))
-        #                   .drop(columns=['entity']))
-        self.taxcode = taxcode
+        if hasattr(self, 'ptaxcode'):
+            return
+        from .utils.globalcache import c
+        taxcode = c.get_taxcode(self.src, self.npis)
+        if self.entities == 1 or self.entities == [1]:
+            taxcode = (taxcode.merge(self.entity.query('entity==1'))
+                              .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            taxcode = (taxcode.merge(self.entity.query('entity==2'))
+                              .drop(columns=['entity']))
+        self.ptaxcode = taxcode
 
     def get_fullnames(self):
         if hasattr(self, 'fullnames'):
@@ -533,3 +517,33 @@ def get_nameoth(src, npis, entity, name_stub):
     nameoth[name_stub] = nameoth[name_stub].str.upper()
     nameoth = nameoth[['npi', name_stub]].drop_duplicates()
     return nameoth
+
+
+def get_taxcode(src, npis):
+    """
+    Retrieves taxonomy codes (including all 15 entries if necessary)
+    Entity type 1 or 2 can have a taxcode
+    Returns non-temporal data; all taxcodes associated with a given NPI
+    """
+    taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
+    taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
+    taxonomy_path = ('/home/akilby/Packages/claims_data/src/claims_data/'
+                     'data/Provider Taxonomies - Labeled.csv')
+    tax = pd.read_csv(taxonomy_path)
+    tax.columns = ['EntityType', 'Type', 'Classification',
+                   'Specialization', 'TaxonomyCode']
+    pa = (tax.query('Classification == "Physician Assistant"')
+             .TaxonomyCode
+             .tolist())
+    np = (tax.query('Classification == "Nurse Practitioner"')
+             .TaxonomyCode
+             .tolist())
+    mddo = (tax.query('Type=="Allopathic & Osteopathic Physicians"')
+               .TaxonomyCode
+               .tolist())
+    student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
+    taxcode.loc[taxcode.ptaxcode.isin(pa), 'cat'] = 'PA'
+    taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'NP'
+    taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
+    taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
+    return taxcode
