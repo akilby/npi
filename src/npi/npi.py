@@ -3,11 +3,7 @@ Notes: for names, and fullnames, only for entity=1
 Also, stored at the individual, not individual-month level
 
 For addresses, should really add the other practice addresses (ploc2) that got
-added
-to the NPI in recent years
-in different files
-
-
+added to the NPI in recent years in different files
 """
 
 import os
@@ -17,9 +13,6 @@ import pandas as pd
 
 src = '/work/akilby/npi/data/'
 
-# entity initialization not fully incorporated
-# add deactivations
-
 
 class NPI(object):
     def __init__(self, src, npis=None, entities=[1, 2]):
@@ -27,10 +20,14 @@ class NPI(object):
         self.npis = npis
         self.entities = entities
         self.get_entity()
-        print(dir(self))
 
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
+
+    def retrieve_all(self):
+        fc = [x.replace('get_', '') for x in dir(self) if x.startswith('get_')]
+        for f in fc:
+            self.retrieve(f)
 
     def get_entity(self):
         if hasattr(self, 'entity'):
