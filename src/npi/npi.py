@@ -35,43 +35,58 @@ class NPI(object):
         self.entity = c.get_entity(self.src, self.npis)
 
     def get_pfname(self):
-        if hasattr(self, 'pfname') or self.entities == 2:
+        if hasattr(self, 'pfname') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.pfname = c.get_name(self.src, self.npis, self.entity, 'pfname')
 
     def get_pmname(self):
-        if hasattr(self, 'pmname') or self.entities == 2:
+        if hasattr(self, 'pmname') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.pmname = c.get_name(self.src, self.npis, self.entity, 'pmname')
 
     def get_plname(self):
-        if hasattr(self, 'plname') or self.entities == 2:
+        if hasattr(self, 'plname') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.plname = c.get_name(self.src, self.npis, self.entity, 'plname')
 
     def get_pfnameoth(self):
-        if hasattr(self, 'pfnameoth') or self.entities == 2:
+        if hasattr(self, 'pfnameoth') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.pfnameoth = c.get_nameoth(
             self.src, self.npis, self.entity, 'pfnameoth')
 
     def get_pmnameoth(self):
-        if hasattr(self, 'pmnameoth') or self.entities == 2:
+        if hasattr(self, 'pmnameoth') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.pmnameoth = c.get_nameoth(
             self.src, self.npis, self.entity, 'pmnameoth')
 
     def get_plnameoth(self):
-        if hasattr(self, 'plnameoth') or self.entities == 2:
+        if hasattr(self, 'plnameoth') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
         self.plnameoth = c.get_nameoth(
             self.src, self.npis, self.entity, 'plnameoth')
+
+    def get_pcredential(self):
+        # return if only orgs?
+        if hasattr(self, 'pcredential') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.pcredential = c.get_cred(
+            self.src, self.npis, self.entity, 'pcredential')
+
+    def get_pcredentialoth(self):
+        if hasattr(self, 'pcredentialoth') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.pcredentialoth = c.get_cred(
+            self.src, self.npis, self.entity, 'pcredentialoth')
 
     def get_plocline1(self):
         # deal with entity selection
@@ -140,46 +155,8 @@ class NPI(object):
                                            .str.replace(' ', ''))
         self.ploctel = loctel
 
-    def get_cred(self, name_stub):
-        # Entity selection or is this only for entity=1
-        # At the individual level
-        src = self.src
-        credential = read_csv_npi(os.path.join(src, '%s.csv' % name_stub),
-                                  self.npis)
-        credential = credential.dropna()
-        credential[name_stub] = credential[name_stub].str.upper()
-        credential = credential[['npi', name_stub]].drop_duplicates()
-        credential = (credential.merge(self.entity.query('entity==1'))
-                                .drop(columns=['entity']))
-        credential[name_stub] = credential[name_stub].str.replace('.', '')
-        credential = (credential.reset_index()
-                                .merge(
-                                    (credential[name_stub].str
-                                                          .split(',',
-                                                                 expand=True)
-                                                          .stack()
-                                                          .reset_index()),
-                                    left_on='index', right_on='level_0')
-                                .drop(columns=['index', name_stub,
-                                               'level_0', 'level_1'])
-                                .rename(columns={0: name_stub}))
-        credential[name_stub] = credential[name_stub].str.strip()
-        credential = credential.drop_duplicates()
-        return credential
-
-    def get_pcredential(self):
-        # return if only orgs?
-        if hasattr(self, 'pcredential'):
-            return
-        self.pcredential = self.get_nameoth('pcredential')
-
-    def get_pcredentialoth(self):
-        if hasattr(self, 'pcredentialoth'):
-            return
-        self.pcredentialoth = self.get_nameoth('pcredentialoth')
-
     def get_credentials(self):
-        if hasattr(self, 'credentials'):
+        if hasattr(self, 'credentials') or self.entities in [2, [2]]:
             return
         self.get_pcredential()
         self.get_pcredentialoth()
@@ -492,7 +469,7 @@ def get_name(src, npis, entity, name_stub):
     """
     Retrieves pfname, pmname, and plname
     Only for entity type 1
-    Returns non-temporal data; all names associated with a given NPI
+    Returns non-temporal data: all names associated with a given NPI
     """
     name = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
     name['%s' % name_stub] = name[name_stub].str.upper()
@@ -507,7 +484,7 @@ def get_nameoth(src, npis, entity, name_stub):
     """
     Retrieves pfnameoth, pmnameoth, and plnameoth
     Only for entity type 1
-    Returns non-temporal data; all names associated with a given NPI
+    Returns non-temporal data: all names associated with a given NPI
     """
     nameoth = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
     assert nameoth.dropna().merge(entity).entity.value_counts().index == [1]
@@ -547,3 +524,33 @@ def get_taxcode(src, npis):
     taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
     taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
     return taxcode
+
+
+def get_cred(src, npis, entity, name_stub):
+    """
+    Retrieves credential, credentialoth
+    Only for entity type 1
+    Returns non-temporal data: all credentials associated with a given NPI
+    """
+    credential = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
+    assert credential.dropna().merge(entity).entity.value_counts().index == [1]
+    credential = credential.dropna()
+    credential = (credential.merge(entity.query('entity==1'))
+                            .drop(columns=['entity']))
+    credential[name_stub] = credential[name_stub].str.upper()
+    credential = credential[['npi', name_stub]].drop_duplicates()
+    credential[name_stub] = credential[name_stub].str.replace('.', '')
+    credential = (credential.reset_index()
+                            .merge(
+                                (credential[name_stub].str
+                                                      .split(',',
+                                                             expand=True)
+                                                      .stack()
+                                                      .reset_index()),
+                                left_on='index', right_on='level_0')
+                            .drop(columns=['index', name_stub,
+                                           'level_0', 'level_1'])
+                            .rename(columns={0: name_stub}))
+    credential[name_stub] = credential[name_stub].str.strip()
+    credential = credential.drop_duplicates()
+    return credential
