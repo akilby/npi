@@ -2,7 +2,8 @@
 Notes: for names, and fullnames, only for entity=1
 Also, stored at the individual, not individual-month level
 
-For addresses, should really add the other practice addresses that got added
+For addresses, should really add the other practice addresses (ploc2) that got
+added
 to the NPI in recent years
 in different files
 
@@ -35,6 +36,38 @@ class NPI(object):
             return
         from .utils.globalcache import c
         self.entity = c.get_entity(self.src, self.npis)
+
+    def get_npideactdate(self):
+        if hasattr(self, 'npideactdate'):
+            return
+        from .utils.globalcache import c
+        self.npideactdate = c.get_deactdate(self.src, self.npis)
+
+    def get_npireactdate(self):
+        if hasattr(self, 'npireactdate'):
+            return
+        from .utils.globalcache import c
+        self.npireactdate = c.get_reactdate(self.src, self.npis)
+
+    def get_removaldate(self):
+        if hasattr(self, 'removaldate'):
+            return
+        self.get_npideactdate()
+        self.get_npireactdate()
+        removaldate = (self.npideactdate
+                           .merge(self.npideactdate
+                                      .merge(self.npireactdate)
+                                      .query('npireactdate>=npideactdate'),
+                                  how='left', indicator=True)
+                           .query('_merge!="both"')
+                           .drop(columns=['npireactdate', '_merge']))
+        if self.entities == 1 or self.entities == [1]:
+            removaldate = (removaldate.merge(self.entity.query('entity==1'))
+                                      .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            removaldate = (removaldate.merge(self.entity.query('entity==2'))
+                                      .drop(columns=['entity']))
+        self.removaldate = removaldate
 
     def get_pfname(self):
         if hasattr(self, 'pfname') or self.entities in [2, [2]]:
@@ -91,7 +124,7 @@ class NPI(object):
 
     def get_plocline1(self):
         """Is time varying, and exists for both entity types"""
-        # deal with deactivation
+        # deal with deactivation/removal date
         if hasattr(self, 'plocline1'):
             return
         locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
@@ -353,6 +386,20 @@ def get_entity(src, npis):
     entity['entity'] = entity.entity.astype("int")
     entity = entity[['npi', 'entity']].drop_duplicates()
     return entity
+
+
+def get_deactdate(src, npis):
+    deact = read_csv_npi(os.path.join(src, 'npideactdate.csv'), npis)
+    deact = deact.drop(columns='month').dropna().drop_duplicates()
+    deact['npideactdate'] = pd.to_datetime(deact['npideactdate'])
+    return deact.groupby('npi', as_index=False).max()
+
+
+def get_reactdate(src, npis):
+    react = read_csv_npi(os.path.join(src, 'npireactdate.csv'), npis)
+    react = react.drop(columns='month').dropna().drop_duplicates()
+    react['npireactdate'] = pd.to_datetime(react['npireactdate'])
+    return react.groupby('npi', as_index=False).max()
 
 
 def get_name(src, npis, entity, name_stub):
