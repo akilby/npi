@@ -27,6 +27,7 @@ class NPI(object):
         self.npis = npis
         self.entities = entities
         self.get_entity()
+        print(dir(self))
 
     def retrieve(self, thing):
         getattr(self, f'get_{thing}')()
