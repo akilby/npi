@@ -123,105 +123,77 @@ class NPI(object):
             self.src, self.npis, self.entity, 'pcredentialoth')
 
     def get_plocline1(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation/removal date
         if hasattr(self, 'plocline1'):
             return
-        locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
-                                self.npis)
-        locline1['plocline1'] = locline1['plocline1'].str.upper()
-        if self.entities == 1 or self.entities == [1]:
-            locline1 = (locline1.merge(self.entity.query('entity==1'))
-                                .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            locline1 = (locline1.merge(self.entity.query('entity==2'))
-                                .drop(columns=['entity']))
-        self.plocline1 = locline1
+        self.get_removaldate()
+        from .utils.globalcache import c
+        self.plocline1 = c.get_address(self.src,
+                                       self.npis,
+                                       self.entity,
+                                       self.removaldate,
+                                       self.entities,
+                                       'plocline1')
 
     def get_plocline2(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation
         if hasattr(self, 'plocline2'):
             return
-        locline2 = read_csv_npi(os.path.join(self.src, 'plocline2.csv'),
-                                self.npis)
-        locline2['plocline2'] = locline2['plocline2'].str.upper()
-        if self.entities == 1 or self.entities == [1]:
-            locline2 = (locline2.merge(self.entity.query('entity==1'))
-                                .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            locline2 = (locline2.merge(self.entity.query('entity==2'))
-                                .drop(columns=['entity']))
-        self.plocline2 = locline2
+        self.get_removaldate()
+        from .utils.globalcache import c
+        self.plocline2 = c.get_address(self.src,
+                                       self.npis,
+                                       self.entity,
+                                       self.removaldate,
+                                       self.entities,
+                                       'plocline2')
 
     def get_ploccityname(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation
         if hasattr(self, 'ploccityname'):
             return
-        loccityname = read_csv_npi(os.path.join(self.src, 'ploccityname.csv'),
-                                   self.npis)
-        loccityname['ploccityname'] = loccityname['ploccityname'].str.upper()
-        if self.entities == 1 or self.entities == [1]:
-            loccityname = (loccityname.merge(self.entity.query('entity==1'))
-                                      .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            loccityname = (loccityname.merge(self.entity.query('entity==2'))
-                                      .drop(columns=['entity']))
-        self.ploccityname = loccityname
+        self.get_removaldate()
+        from .utils.globalcache import c
+        self.ploccityname = c.get_address(self.src,
+                                          self.npis,
+                                          self.entity,
+                                          self.removaldate,
+                                          self.entities,
+                                          'ploccityname')
 
     def get_plocstatename(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation
         if hasattr(self, 'plocstatename'):
             return
-        locstatename = read_csv_npi(
-            os.path.join(self.src, 'plocstatename.csv'), self.npis)
-        stub = 'plocstatename'
-        locstatename[stub] = locstatename[stub].str.upper()
-        if self.entities == 1 or self.entities == [1]:
-            locstatename = (locstatename.merge(self.entity.query('entity==1'))
-                                        .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            locstatename = (locstatename.merge(self.entity.query('entity==2'))
-                                        .drop(columns=['entity']))
-        self.plocstatename = locstatename
+        self.get_removaldate()
+        from .utils.globalcache import c
+        self.plocstatename = c.get_address(self.src,
+                                           self.npis,
+                                           self.entity,
+                                           self.removaldate,
+                                           self.entities,
+                                           'plocstatename')
 
     def get_ploczip(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation
         if hasattr(self, 'ploczip'):
             return
-        loczip = read_csv_npi(os.path.join(self.src, 'ploczip.csv'),
-                              self.npis)
-        if self.entities == 1 or self.entities == [1]:
-            loczip = (loczip.merge(self.entity.query('entity==1'))
-                            .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            loczip = (loczip.merge(self.entity.query('entity==2'))
-                            .drop(columns=['entity']))
-        self.ploczip = loczip
+        self.get_removaldate()
+        from .utils.globalcache import c
+        self.ploczip = c.get_address(self.src,
+                                     self.npis,
+                                     self.entity,
+                                     self.removaldate,
+                                     self.entities,
+                                     'ploczip')
 
     def get_ploctel(self):
-        """Is time varying, and exists for both entity types"""
-        # deal with deactivation
+        # Is .upper()ing a problem?
         if hasattr(self, 'loctel'):
             return
-        loctel = read_csv_npi(os.path.join(self.src, 'ploctel.csv'),
-                              self.npis)
-        loctel['ploctel'] = (loctel.ploctel
-                                   .astype('str')
-                                   .str.split('.', expand=True)[0])
-        loctel['ploctel'] = (loctel.ploctel.str.replace('-', '')
-                                           .str.replace('(', '')
-                                           .str.replace(')', '')
-                                           .str.replace(' ', ''))
-        if self.entities == 1 or self.entities == [1]:
-            loctel = (loctel.merge(self.entity.query('entity==1'))
-                            .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            loctel = (loctel.merge(self.entity.query('entity==2'))
-                            .drop(columns=['entity']))
+        self.get_removaldate()
+        from .utils.globalcache import c
+        loctel = c.get_address(self.src,
+                               self.npis,
+                               self.entity,
+                               self.removaldate,
+                               self.entities,
+                               'ploczip')
         self.ploctel = loctel
 
     def get_credentials(self):
@@ -650,3 +622,29 @@ def parens_clean(df):
             .reset_index(drop=True).fillna(''))
     df['pfname'] = df.pfname.apply(lambda x: _delete(x, ')'))
     return df
+
+
+def get_address(src, npis, entity, removaldate, entities, name_stub):
+    """Is time varying, and exists for both entity types"""
+    address = read_csv_npi(os.path.join(src, '%s.csv' % name_stub), npis)
+    if 'name_stub' == 'ploctel':
+        address['ploctel'] = (address.ploctel
+                                     .astype('str')
+                                     .str.split('.', expand=True)[0])
+        address['ploctel'] = (address.ploctel.str.replace('-', '')
+                                             .str.replace('(', '')
+                                             .str.replace(')', '')
+                                             .str.replace(' ', ''))
+    address[name_stub] = address[name_stub].str.upper()
+    if entities == 1 or entities == [1]:
+        address = (address.merge(entity.query('entity==1'))
+                          .drop(columns=['entity']))
+    elif entities == 2 or entities == [2]:
+        address = (address.merge(entity.query('entity==2'))
+                          .drop(columns=['entity']))
+    address = address.merge(removaldate, how='left', indicator=True)
+    address['month'] = pd.to_datetime(address.month)
+    address = address[(address.month <= address.npideactdate) |
+                      (address.npideactdate.isnull())]
+    address = address.drop(columns=['npideactdate', '_merge'])
+    return address
