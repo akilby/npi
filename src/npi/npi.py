@@ -172,6 +172,24 @@ class NPI(object):
                                                           .str.upper())
         self.credentials = credentials
 
+    def get_fullnames(self):
+        if hasattr(self, 'fullnames') or self.entities in [2, [2]]:
+            return
+        self.get_pfname()
+        self.get_pmname()
+        self.get_plname()
+        self.get_pfnameoth()
+        self.get_pmnameoth()
+        self.get_plnameoth()
+
+        from .utils.globalcache import c
+        self.fullnames = c.get_fullnames(self.pfname,
+                                         self.pmname,
+                                         self.plname,
+                                         self.pfnameoth,
+                                         self.pmnameoth,
+                                         self.plnameoth)
+
     def get_ptaxcode(self):
         if hasattr(self, 'ptaxcode'):
             return
@@ -184,170 +202,6 @@ class NPI(object):
             taxcode = (taxcode.merge(self.entity.query('entity==2'))
                               .drop(columns=['entity']))
         self.ptaxcode = taxcode
-
-    def get_fullnames(self):
-        if hasattr(self, 'fullnames') or self.entities in [2, [2]]:
-            return
-        self.get_pfname()
-        self.get_pmname()
-        self.get_plname()
-        self.get_pfnameoth()
-        self.get_pmnameoth()
-        self.get_plnameoth()
-
-        name_list = ['pfname', 'pmname', 'plname']
-        oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth']
-        ren = {'plnameoth': 'plname',
-               'pfnameoth': 'pfname',
-               'pmnameoth': 'pmname'}
-
-        fullnames = pd.merge(self.pfname, self.plname, how='outer')
-        fullnames = pd.merge(fullnames, self.pmname, how='outer')
-        fullnames = fullnames[['npi'] + name_list]
-        merged = (self.pfnameoth.merge(self.plnameoth, how='outer')
-                                .merge(self.pmnameoth, how='outer')
-                                .merge(self.pfname, how='left')
-                                .merge(self.plname, how='left')
-                                .merge(self.pmname, how='left'))
-        merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
-        merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
-
-        merged2 = merged.copy()
-        merged.loc[merged.pmnameoth.isnull(), 'pmnameoth'] = merged.pmname
-
-        def remove_duplicated_names(merged):
-            merged = (merged.drop(columns=name_list)
-                            .drop_duplicates())
-            merged = (merged.merge(fullnames,
-                                   left_on=['npi'] + oth_list,
-                                   right_on=['npi'] + name_list,
-                                   how='left', indicator=True)
-                            .query('_merge=="left_only"')
-                            .drop(columns=name_list + ['_merge']))
-            return merged
-
-        merged = remove_duplicated_names(merged)
-        merged2 = remove_duplicated_names(merged2)
-
-        merged = merged.append(merged2).drop_duplicates()
-        merged['othflag'] = 1
-        fullnames['othflag'] = 0
-        fullnames = (fullnames.append(merged.rename(columns=ren))
-                              .sort_values(['npi', 'othflag'])
-                              .reset_index(drop=True))
-        self.fullnames = self.fullnames_clean(fullnames)
-
-    def fullnames_clean(self, df):
-        for symbol in ['?', '+', '[', ']', ';']:
-            df = purge_symbol(df, 'pfname', symbol, ['npi'])
-            df = purge_symbol(df, 'pmname', symbol, ['npi'])
-            df = purge_symbol(df, 'plname', symbol, ['npi'])
-        df['pmname'] = df.pmname.apply(lambda x: _middle_initials(x))
-        df['pfname'] = df.pfname.str.strip()
-        df['pmname'] = df.pmname.str.strip()
-        df['plname'] = df.plname.str.strip()
-        for symbol in ['+', '[', ']', ';']:
-            df['pfname'] = df.pfname.apply(lambda x: _delete(x, symbol))
-            df['pmname'] = df.pmname.apply(lambda x: _delete(x, symbol))
-            df['plname'] = df.plname.apply(lambda x: _delete(x, symbol))
-        df = (df.fillna('')
-                .groupby(['npi', 'pfname', 'pmname', 'plname'])
-                .min()
-                .reset_index())
-        df = self.parens_clean(df)
-        df = (df.fillna('')
-                .groupby(['npi', 'pfname', 'pmname', 'plname'])
-                .min()
-                .reset_index())
-        return df
-
-    def parens_clean(self, df):
-        parens = df[df.plname.apply(lambda x: _in(x, '('))]
-        noparens = df[~df.plname.apply(lambda x: _in(x, '('))]
-        parens = parens.reset_index(drop=True)
-        parens['plname0'] = parens.plname.str.split('(').str[0].str.strip()
-        parens['plname1'] = parens.plname.str.split('(').str[1].str.strip()
-        parens['plname2'] = parens.plname1.str.split(')').str[0].str.strip()
-        parens['plname3'] = parens.plname1.str.split(')').str[1].str.strip()
-        parens.drop(columns=['plname1'], inplace=True)
-        parens['plname2'] = (parens.plname2
-                                   .str.replace('FORMERLY', '')
-                                   .str.replace('MAIDEN NAME', '')
-                                   .str.replace("DIDN'T HAVE LAST NAME", "")
-                                   .str.replace('-MAIDEN', '')
-                                   .str.replace('MAIDEN', '')
-                                   .str.replace('CHANGE FROM', '')
-                                   .str.replace('BIRTH', '')
-                                   .str.replace('NEW NAME', '')
-                                   .str.replace('MARRIED NAME', '')
-                                   .str.replace('MARRIED', '')
-                                   .str.replace('SOLE PROPRIETOR', '')
-                                   .str.replace('PREVIOUSLY', '')
-                                   .str.replace('CURRENT NAME', '')
-                                   .str.replace('PREVIOUS NAME', '')
-                                   .str.replace('AND ALSO, ', '')
-                                   .str.replace('CHANGED FROM', '')
-                                   .str.replace('ALSO', '')
-                                   .str.replace(' - USED BOTH', ''))
-        parens['plname3'] = (parens.plname3
-                                   .str.replace(',1ST MARRIED-', '')
-                                   .str.replace('-FORMER MARRIAGE', ''))
-        parens.loc[(parens.plname2 == 'OR'), 'plname2'] = ''
-        parens.loc[(parens.plname2 == ' OR'), 'plname2'] = ''
-        parens.loc[(parens.plname ==
-                    '(1) ALLEN, (2) BRAACK'), 'plname2'] = 'ALLEN'
-        parens.loc[(parens.plname ==
-                    '(1) ALLEN, (2) BRAACK'), 'plname3'] = 'BRAACK'
-        parens = (parens.set_index(['npi', 'pfname',
-                                    'pmname', 'plname', 'othflag'])
-                        .stack(0)
-                        .reset_index()
-                        .drop(columns='level_5')
-                        .rename(columns={0: 'plnamealt'}))
-        parens['plnamealt'] = parens.plnamealt.str.strip()
-        parens = parens.query('plnamealt!=""')
-        parens = parens.reset_index(drop=True)
-        parens.loc[(parens.plname == 'JAMES AND (CHARMOY, LCSW, LCADC)'),
-                   'plnamealt'] = 'CHARMOY'
-        parens['plnamealt'] = parens.plnamealt.str.replace(', ', '')
-        parens = (parens.drop(columns='plname')
-                        .rename(columns={'plnamealt': 'plname'})
-                        .drop_duplicates())
-        df = noparens.append(parens)
-        df.loc[(df.plname == '1)MORENO 2) MORENO'), 'plname'] = 'MORENO'
-        df.loc[(df.pfname == '1)PATRICIA 2)BEATA'), 'pfname'] = 'BEATA'
-        df.loc[(df.pmname == '1) ANN'), 'pmname'] = 'ANN'
-        df.loc[(df.plname == 'P)ERZEL'), 'plname'] = 'PERZEL'
-        df = df[~df.plname.apply(lambda x: _in(x, ')'))]
-        parens = df[df.pfname.apply(lambda x: _in(x, '('))]
-        noparens = df[~df.pfname.apply(lambda x: _in(x, '('))]
-        parens = parens.reset_index(drop=True)
-        parens['pfname0'] = parens.pfname.str.split('(').str[0].str.strip()
-        parens['pfname1'] = parens.pfname.str.split('(').str[1].str.strip()
-        parens['pfname2'] = parens.pfname1.str.split(')').str[0].str.strip()
-        parens['pfname3'] = parens.pfname1.str.split(')').str[1].str.strip()
-        parens.drop(columns=['pfname1'], inplace=True)
-        parens['pfname2'] = (parens.pfname2
-                                   .str.replace('LEGAL NAME', '')
-                                   .str.replace('408', '')
-                                   .str.replace('510', ''))
-        parens = (parens.set_index(['npi', 'pfname',
-                                    'pmname', 'plname', 'othflag'])
-                        .stack(0)
-                        .reset_index()
-                        .drop(columns='level_5')
-                        .rename(columns={0: 'pfnamealt'}))
-        parens['pfnamealt'] = parens.pfnamealt.str.strip()
-        parens = parens.query('pfnamealt!=""')
-        parens = parens.reset_index(drop=True)
-        parens = (parens.drop(columns='pfname')
-                        .rename(columns={'pfnamealt': 'pfname'})
-                        .drop_duplicates())
-        df = noparens.append(parens)
-        df = (df.query('pfname!="NONE" or plname!="NONE"')
-                .reset_index(drop=True).fillna(''))
-        df['pfname'] = df.pfname.apply(lambda x: _delete(x, ')'))
-        return df
 
     def get_expanded_fullnames(self):
         if hasattr(self, 'expanded_fullnames'):
@@ -554,3 +408,162 @@ def get_cred(src, npis, entity, name_stub):
     credential[name_stub] = credential[name_stub].str.strip()
     credential = credential.drop_duplicates()
     return credential
+
+
+def get_fullnames(pfname, pmname, plname, pfnameoth, pmnameoth, plnameoth):
+    name_list = ['pfname', 'pmname', 'plname']
+    oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth']
+    ren = {'plnameoth': 'plname',
+           'pfnameoth': 'pfname',
+           'pmnameoth': 'pmname'}
+
+    fullnames = pd.merge(pfname, plname, how='outer')
+    fullnames = pd.merge(fullnames, pmname, how='outer')
+    fullnames = fullnames[['npi'] + name_list]
+    merged = (pfnameoth.merge(plnameoth, how='outer')
+                       .merge(pmnameoth, how='outer')
+                       .merge(pfname, how='left')
+                       .merge(plname, how='left')
+                       .merge(pmname, how='left'))
+    merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
+    merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
+
+    merged2 = merged.copy()
+    merged.loc[merged.pmnameoth.isnull(), 'pmnameoth'] = merged.pmname
+
+    def remove_duplicated_names(merged):
+        merged = (merged.drop(columns=name_list)
+                        .drop_duplicates())
+        merged = (merged.merge(fullnames,
+                               left_on=['npi'] + oth_list,
+                               right_on=['npi'] + name_list,
+                               how='left', indicator=True)
+                        .query('_merge=="left_only"')
+                        .drop(columns=name_list + ['_merge']))
+        return merged
+
+    merged = remove_duplicated_names(merged)
+    merged2 = remove_duplicated_names(merged2)
+
+    merged = merged.append(merged2).drop_duplicates()
+    merged['othflag'] = 1
+    fullnames['othflag'] = 0
+    fullnames = (fullnames.append(merged.rename(columns=ren))
+                          .sort_values(['npi', 'othflag'])
+                          .reset_index(drop=True))
+    fullnames = fullnames_clean(fullnames)
+    return fullnames
+
+
+def fullnames_clean(df):
+    for symbol in ['?', '+', '[', ']', ';']:
+        df = purge_symbol(df, 'pfname', symbol, ['npi'])
+        df = purge_symbol(df, 'pmname', symbol, ['npi'])
+        df = purge_symbol(df, 'plname', symbol, ['npi'])
+    df['pmname'] = df.pmname.apply(lambda x: _middle_initials(x))
+    df['pfname'] = df.pfname.str.strip()
+    df['pmname'] = df.pmname.str.strip()
+    df['plname'] = df.plname.str.strip()
+    for symbol in ['+', '[', ']', ';']:
+        df['pfname'] = df.pfname.apply(lambda x: _delete(x, symbol))
+        df['pmname'] = df.pmname.apply(lambda x: _delete(x, symbol))
+        df['plname'] = df.plname.apply(lambda x: _delete(x, symbol))
+    df = (df.fillna('')
+            .groupby(['npi', 'pfname', 'pmname', 'plname'])
+            .min()
+            .reset_index())
+    df = parens_clean(df)
+    df = (df.fillna('')
+            .groupby(['npi', 'pfname', 'pmname', 'plname'])
+            .min()
+            .reset_index())
+    return df
+
+
+def parens_clean(df):
+    parens = df[df.plname.apply(lambda x: _in(x, '('))]
+    noparens = df[~df.plname.apply(lambda x: _in(x, '('))]
+    parens = parens.reset_index(drop=True)
+    parens['plname0'] = parens.plname.str.split('(').str[0].str.strip()
+    parens['plname1'] = parens.plname.str.split('(').str[1].str.strip()
+    parens['plname2'] = parens.plname1.str.split(')').str[0].str.strip()
+    parens['plname3'] = parens.plname1.str.split(')').str[1].str.strip()
+    parens.drop(columns=['plname1'], inplace=True)
+    parens['plname2'] = (parens.plname2
+                               .str.replace('FORMERLY', '')
+                               .str.replace('MAIDEN NAME', '')
+                               .str.replace("DIDN'T HAVE LAST NAME", "")
+                               .str.replace('-MAIDEN', '')
+                               .str.replace('MAIDEN', '')
+                               .str.replace('CHANGE FROM', '')
+                               .str.replace('BIRTH', '')
+                               .str.replace('NEW NAME', '')
+                               .str.replace('MARRIED NAME', '')
+                               .str.replace('MARRIED', '')
+                               .str.replace('SOLE PROPRIETOR', '')
+                               .str.replace('PREVIOUSLY', '')
+                               .str.replace('CURRENT NAME', '')
+                               .str.replace('PREVIOUS NAME', '')
+                               .str.replace('AND ALSO, ', '')
+                               .str.replace('CHANGED FROM', '')
+                               .str.replace('ALSO', '')
+                               .str.replace(' - USED BOTH', ''))
+    parens['plname3'] = (parens.plname3
+                               .str.replace(',1ST MARRIED-', '')
+                               .str.replace('-FORMER MARRIAGE', ''))
+    parens.loc[(parens.plname2 == 'OR'), 'plname2'] = ''
+    parens.loc[(parens.plname2 == ' OR'), 'plname2'] = ''
+    parens.loc[(parens.plname ==
+                '(1) ALLEN, (2) BRAACK'), 'plname2'] = 'ALLEN'
+    parens.loc[(parens.plname ==
+                '(1) ALLEN, (2) BRAACK'), 'plname3'] = 'BRAACK'
+    parens = (parens.set_index(['npi', 'pfname',
+                                'pmname', 'plname', 'othflag'])
+                    .stack(0)
+                    .reset_index()
+                    .drop(columns='level_5')
+                    .rename(columns={0: 'plnamealt'}))
+    parens['plnamealt'] = parens.plnamealt.str.strip()
+    parens = parens.query('plnamealt!=""')
+    parens = parens.reset_index(drop=True)
+    parens.loc[(parens.plname == 'JAMES AND (CHARMOY, LCSW, LCADC)'),
+               'plnamealt'] = 'CHARMOY'
+    parens['plnamealt'] = parens.plnamealt.str.replace(', ', '')
+    parens = (parens.drop(columns='plname')
+                    .rename(columns={'plnamealt': 'plname'})
+                    .drop_duplicates())
+    df = noparens.append(parens)
+    df.loc[(df.plname == '1)MORENO 2) MORENO'), 'plname'] = 'MORENO'
+    df.loc[(df.pfname == '1)PATRICIA 2)BEATA'), 'pfname'] = 'BEATA'
+    df.loc[(df.pmname == '1) ANN'), 'pmname'] = 'ANN'
+    df.loc[(df.plname == 'P)ERZEL'), 'plname'] = 'PERZEL'
+    df = df[~df.plname.apply(lambda x: _in(x, ')'))]
+    parens = df[df.pfname.apply(lambda x: _in(x, '('))]
+    noparens = df[~df.pfname.apply(lambda x: _in(x, '('))]
+    parens = parens.reset_index(drop=True)
+    parens['pfname0'] = parens.pfname.str.split('(').str[0].str.strip()
+    parens['pfname1'] = parens.pfname.str.split('(').str[1].str.strip()
+    parens['pfname2'] = parens.pfname1.str.split(')').str[0].str.strip()
+    parens['pfname3'] = parens.pfname1.str.split(')').str[1].str.strip()
+    parens.drop(columns=['pfname1'], inplace=True)
+    parens['pfname2'] = (parens.pfname2
+                               .str.replace('LEGAL NAME', '')
+                               .str.replace('408', '')
+                               .str.replace('510', ''))
+    parens = (parens.set_index(['npi', 'pfname',
+                                'pmname', 'plname', 'othflag'])
+                    .stack(0)
+                    .reset_index()
+                    .drop(columns='level_5')
+                    .rename(columns={0: 'pfnamealt'}))
+    parens['pfnamealt'] = parens.pfnamealt.str.strip()
+    parens = parens.query('pfnamealt!=""')
+    parens = parens.reset_index(drop=True)
+    parens = (parens.drop(columns='pfname')
+                    .rename(columns={'pfnamealt': 'pfname'})
+                    .drop_duplicates())
+    df = noparens.append(parens)
+    df = (df.query('pfname!="NONE" or plname!="NONE"')
+            .reset_index(drop=True).fillna(''))
+    df['pfname'] = df.pfname.apply(lambda x: _delete(x, ')'))
+    return df
