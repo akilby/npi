@@ -186,7 +186,7 @@ class NPI(object):
         self.ptaxcode = taxcode
 
     def get_fullnames(self):
-        if hasattr(self, 'fullnames'):
+        if hasattr(self, 'fullnames') or self.entities in [2, [2]]:
             return
         self.get_pfname()
         self.get_pmname()
@@ -201,14 +201,14 @@ class NPI(object):
                'pfnameoth': 'pfname',
                'pmnameoth': 'pmname'}
 
-        fullnames = pd.merge(self.fname, self.lname, how='outer')
-        fullnames = pd.merge(fullnames, self.mname, how='outer')
+        fullnames = pd.merge(self.pfname, self.plname, how='outer')
+        fullnames = pd.merge(fullnames, self.pmname, how='outer')
         fullnames = fullnames[['npi'] + name_list]
-        merged = (self.fnameoth.merge(self.lnameoth, how='outer')
-                               .merge(self.mnameoth, how='outer')
-                               .merge(self.fname, how='left')
-                               .merge(self.lname, how='left')
-                               .merge(self.mname, how='left'))
+        merged = (self.pfnameoth.merge(self.plnameoth, how='outer')
+                                .merge(self.pmnameoth, how='outer')
+                                .merge(self.pfname, how='left')
+                                .merge(self.plname, how='left')
+                                .merge(self.pmname, how='left'))
         merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
         merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
 
