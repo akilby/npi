@@ -2,6 +2,10 @@
 Notes: for names, and fullnames, only for entity=1
 Also, stored at the individual, not individual-month level
 
+For addresses, should really add the other practice addresses that got added
+to the NPI in recent years
+in different files
+
 
 """
 
@@ -14,8 +18,6 @@ src = '/work/akilby/npi/data/'
 
 # entity initialization not fully incorporated
 # add deactivations
-# Add cacher
-# fix p stubs
 
 
 class NPI(object):
@@ -74,7 +76,6 @@ class NPI(object):
             self.src, self.npis, self.entity, 'plnameoth')
 
     def get_pcredential(self):
-        # return if only orgs?
         if hasattr(self, 'pcredential') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
@@ -89,37 +90,55 @@ class NPI(object):
             self.src, self.npis, self.entity, 'pcredentialoth')
 
     def get_plocline1(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'plocline1'):
             return
         locline1 = read_csv_npi(os.path.join(self.src, 'plocline1.csv'),
                                 self.npis)
         locline1['plocline1'] = locline1['plocline1'].str.upper()
+        if self.entities == 1 or self.entities == [1]:
+            locline1 = (locline1.merge(self.entity.query('entity==1'))
+                                .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            locline1 = (locline1.merge(self.entity.query('entity==2'))
+                                .drop(columns=['entity']))
         self.plocline1 = locline1
 
     def get_plocline2(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'plocline2'):
             return
         locline2 = read_csv_npi(os.path.join(self.src, 'plocline2.csv'),
                                 self.npis)
         locline2['plocline2'] = locline2['plocline2'].str.upper()
+        if self.entities == 1 or self.entities == [1]:
+            locline2 = (locline2.merge(self.entity.query('entity==1'))
+                                .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            locline2 = (locline2.merge(self.entity.query('entity==2'))
+                                .drop(columns=['entity']))
         self.plocline2 = locline2
 
     def get_ploccityname(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'ploccityname'):
             return
         loccityname = read_csv_npi(os.path.join(self.src, 'ploccityname.csv'),
                                    self.npis)
         loccityname['ploccityname'] = loccityname['ploccityname'].str.upper()
+        if self.entities == 1 or self.entities == [1]:
+            loccityname = (loccityname.merge(self.entity.query('entity==1'))
+                                      .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            loccityname = (loccityname.merge(self.entity.query('entity==2'))
+                                      .drop(columns=['entity']))
         self.ploccityname = loccityname
 
     def get_plocstatename(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'plocstatename'):
             return
@@ -127,20 +146,31 @@ class NPI(object):
             os.path.join(self.src, 'plocstatename.csv'), self.npis)
         stub = 'plocstatename'
         locstatename[stub] = locstatename[stub].str.upper()
+        if self.entities == 1 or self.entities == [1]:
+            locstatename = (locstatename.merge(self.entity.query('entity==1'))
+                                        .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            locstatename = (locstatename.merge(self.entity.query('entity==2'))
+                                        .drop(columns=['entity']))
         self.plocstatename = locstatename
 
     def get_ploczip(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'ploczip'):
             return
         loczip = read_csv_npi(os.path.join(self.src, 'ploczip.csv'),
                               self.npis)
-
+        if self.entities == 1 or self.entities == [1]:
+            loczip = (loczip.merge(self.entity.query('entity==1'))
+                            .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            loczip = (loczip.merge(self.entity.query('entity==2'))
+                            .drop(columns=['entity']))
         self.ploczip = loczip
 
     def get_ploctel(self):
-        # deal with entity selection
+        """Is time varying, and exists for both entity types"""
         # deal with deactivation
         if hasattr(self, 'loctel'):
             return
@@ -153,6 +183,12 @@ class NPI(object):
                                            .str.replace('(', '')
                                            .str.replace(')', '')
                                            .str.replace(' ', ''))
+        if self.entities == 1 or self.entities == [1]:
+            loctel = (loctel.merge(self.entity.query('entity==1'))
+                            .drop(columns=['entity']))
+        elif self.entities == 2 or self.entities == [2]:
+            loctel = (loctel.merge(self.entity.query('entity==2'))
+                            .drop(columns=['entity']))
         self.ploctel = loctel
 
     def get_credentials(self):
@@ -204,7 +240,7 @@ class NPI(object):
         self.ptaxcode = taxcode
 
     def get_expanded_fullnames(self):
-        if hasattr(self, 'expanded_fullnames'):
+        if hasattr(self, 'expanded_fullnames') or self.entities in [2, [2]]:
             return
         self.get_fullnames()
         f = self.fullnames.copy()
