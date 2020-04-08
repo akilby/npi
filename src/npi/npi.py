@@ -15,10 +15,10 @@ src = '/work/akilby/npi/data/'
 
 
 class NPI(object):
-    def __init__(self, src, npis=None, entities=[1, 2]):
+    def __init__(self, src=src, npis=None, entities=[1, 2]):
         self.src = src
         self.npis = npis
-        self.entities = entities
+        self.entities = _normalize_entities(entities)
         self.get_entity()
 
     def retrieve(self, thing):
@@ -299,6 +299,17 @@ def _delete(x, obj): return ((x.replace(obj, '') if obj in x else x)
 
 
 def _in_multi(x, list_objs): return any([_in(x, obj) for obj in list_objs])
+
+
+def _normalize_entities(entities):
+    if entities == [1] or entities == 1:
+        return [1]
+    elif entities == [2] or entities == 2:
+        return [2]
+    elif entities == [1, 2] or entities == [2, 1]:
+        return [1, 2]
+    else:
+        raise ValueError("Value %s not a valid value for entities" % entities)
 
 
 def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
