@@ -10,6 +10,7 @@ import os
 import re
 
 import pandas as pd
+from utility_data.taxonomies import provider_taxonomies
 
 src = '/work/akilby/npi/data/'
 
@@ -414,19 +415,17 @@ def get_nameoth(src, npis, entity, name_stub):
     return nameoth
 
 
-def get_taxcode(src, npis):
+def get_taxcode(src, npis, temporal=False):
     """
     Retrieves taxonomy codes (including all 15 entries if necessary)
     Entity type 1 or 2 can have a taxcode
-    Returns non-temporal data; all taxcodes associated with a given NPI
+    Returns non-temporal data unless otherwise specified;
+    all taxcodes associated with a given NPI
     """
     taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
-    taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
-    taxonomy_path = ('/home/akilby/Packages/claims_data/src/claims_data/'
-                     'data/Provider Taxonomies - Labeled.csv')
-    tax = pd.read_csv(taxonomy_path)
-    tax.columns = ['EntityType', 'Type', 'Classification',
-                   'Specialization', 'TaxonomyCode']
+    if not temporal:
+        taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
+    tax = provider_taxonomies()
     pa = (tax.query('Classification == "Physician Assistant"')
              .TaxonomyCode
              .tolist())
