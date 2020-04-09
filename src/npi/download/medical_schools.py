@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 
 med_school_partials_folder = '/work/akilby/npi/data/medical_schools'
 raw_folder = '/work/akilby/npi/raw_web'
+final_data_path = '/work/akilby/npi/data/medical_schools/medical_schools.csv'
 
 
 class HTMLTableParser:
@@ -126,7 +127,7 @@ def retrieve_npis(npi_list, save_path='/work/akilby/npi/raw_web/',
         return pd.DataFrame(), not_found
 
 
-def update_db(raw_folder, med_school_partials_folder, save=None):
+def update_db(raw_folder, med_school_partials_folder, save=final_data_path):
     '''
     Pulls updates from the raw data folder and saves to a
     med school partial file. then concatenates all partial

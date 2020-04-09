@@ -234,13 +234,8 @@ class NPI(object):
         if hasattr(self, 'ptaxcode'):
             return
         from .utils.globalcache import c
-        taxcode = c.get_taxcode(self.src, self.npis)
-        if self.entities == 1 or self.entities == [1]:
-            taxcode = (taxcode.merge(self.entity.query('entity==1'))
-                              .drop(columns=['entity']))
-        elif self.entities == 2 or self.entities == [2]:
-            taxcode = (taxcode.merge(self.entity.query('entity==2'))
-                              .drop(columns=['entity']))
+        taxcode = c.get_taxcode(
+            self.src, self.npis, self.entity, self.entities)
         self.ptaxcode = taxcode
 
     def get_expanded_fullnames(self):
@@ -415,7 +410,7 @@ def get_nameoth(src, npis, entity, name_stub):
     return nameoth
 
 
-def get_taxcode(src, npis, temporal=False):
+def get_taxcode(src, npis, entity, entities, temporal=False):
     """
     Retrieves taxonomy codes (including all 15 entries if necessary)
     Entity type 1 or 2 can have a taxcode
@@ -425,6 +420,14 @@ def get_taxcode(src, npis, temporal=False):
     taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
     if not temporal:
         taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
+    else:
+        taxcode['month'] = pd.to_datetime(taxcode.month)
+    if entities == 1 or entities == [1]:
+        taxcode = (taxcode.merge(entity.query('entity==1'))
+                          .drop(columns=['entity']))
+    elif entities == 2 or entities == [2]:
+        taxcode = (taxcode.merge(entity.query('entity==2'))
+                          .drop(columns=['entity']))
     tax = provider_taxonomies()
     pa = (tax.query('Classification == "Physician Assistant"')
              .TaxonomyCode
@@ -656,3 +659,55 @@ def get_address(src, npis, entity, removaldate, entities, name_stub):
                       (address.npideactdate.isnull())]
     address = address.drop(columns=['npideactdate', '_merge'])
     return address
+
+
+def get_training_dates(taxcode, medical_schools):
+    '''
+    MD training details for people who show up as MD Student
+    And MD in the NPI data
+    '''
+    # could add in discontinuities in location during training period
+    # would likely represent med school, internship, residency, fellowship
+
+    mds = taxcode.query('cat=="MD/DO"').npi.drop_duplicates()
+    studs = taxcode.query('cat=="MD/DO Student"').npi.drop_duplicates()
+    fresh_mds = mds[mds.npi.isin(studs)]
+    old_mds = mds[~mds.npi.isin(studs)]
+    trainees = studs[~studs.npi.isin(mds)]
+
+    fresh_mds = (taxcode.query('cat=="MD/DO"')[['npi']]
+                        .drop_duplicates()
+                        .merge(taxcode.query('cat=="MD/DO Student"')
+                               .npi.drop_duplicates()))
+    fresh_mds = taxcode.merge(fresh_mds)
+    fresh_mds['month'] = pd.to_datetime(fresh_mds.month)
+
+    fresh_mds = (fresh_mds[['npi']]
+                 .drop_duplicates()
+                 .merge((fresh_mds.query('cat=="MD/DO Student"')
+                        .drop(columns=['seq', 'ptaxcode', 'cat'])
+                        .groupby('npi', as_index=False)
+                        .first()
+                        .rename(columns={'month': 'first_student_month'})))
+                 .merge((fresh_mds.query('cat=="MD/DO Student"')
+                        .drop(columns=['seq', 'ptaxcode', 'cat'])
+                        .groupby('npi', as_index=False)
+                        .last()
+                        .rename(columns={'month': 'last_student_month'})))
+                 .merge((fresh_mds.query('cat=="MD/DO"')
+                        .drop(columns=['seq', 'ptaxcode', 'cat'])
+                        .groupby('npi', as_index=False)
+                        .first()
+                        .rename(columns={'month': 'first_md_month'})))
+                 .merge((fresh_mds.query('cat=="MD/DO"')
+                        .drop(columns=['seq', 'ptaxcode', 'cat'])
+                        .groupby('npi', as_index=False)
+                        .last()
+                        .rename(columns={'month': 'last_md_month'}))))
+
+    trainees = (taxcode.query('cat=="MD/DO Student"')[['npi']]
+                       .drop_duplicates()
+                       .merge(taxcode.query('cat=="MD/DO"')
+                              .npi
+                              .drop_duplicates(), how='left', indicator=True)
+                       .query('_merge=="left_only"'))

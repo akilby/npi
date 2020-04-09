@@ -1,3 +1,4 @@
+import glob
 import random
 
 from googleapiclient.discovery import build
@@ -22,6 +23,7 @@ service = build("customsearch",
 
 npi_list = search_df.npi.tolist()
 
+glob.glob('/work/akilby/npi/raw_obit/*.pkl')
 npi_list = [x for x in npi_list if x != 1467775023 and x != 1487674206]
 
 
