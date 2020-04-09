@@ -256,7 +256,6 @@ def reformat(df, variable, is_dissem_file):
 def process_variable(folder, variable, searchlist, final_weekly_updates=True):
     '''
     '''
-    # Should delete NPPES_Data_Dissemination_March_2011 because it's weird
     # searchlist = [x for x in searchlist if x != (2011, 3)]
     df_list = []
     for (year, month) in searchlist:
@@ -283,8 +282,11 @@ def process_variable(folder, variable, searchlist, final_weekly_updates=True):
 
 
 def main_process_variable(variable, update):
+    # Should figure out NPPES_Data_Dissemination_March_2011 because it's weird;
+    # deleting for now
     if not update:
-        df = process_variable(RAW_DATA_DIR, variable, nppes_month_list())
+        searchlist = [x for x in nppes_month_list() if x != (2011, 3)]
+        df = process_variable(RAW_DATA_DIR, variable, searchlist)
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                   index=False)
     else:
@@ -307,6 +309,7 @@ def main_process_variable(variable, update):
             df = df.loc[df.month < df2.month.min()].append(df2)
             assert (df[['npi', 'month']].drop_duplicates().shape[0]
                     == df.shape[0])
+            df = df.query('month != "2011-03-01"')
             df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                       index=False)
 
