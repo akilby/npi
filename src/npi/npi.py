@@ -256,7 +256,7 @@ class NPI(object):
             return
         from .utils.globalcache import c
         training_details = c.get_training_dates(self.src, self.entity)
-        self.training_details = training_details
+        self.training_dates = training_details
 
 
 def purge_nulls(df, var, mergeon):
@@ -419,24 +419,8 @@ def get_nameoth(src, npis, entity, name_stub):
     return nameoth
 
 
-def get_taxcode(src, npis, entity, entities, temporal=False):
-    """
-    Retrieves taxonomy codes (including all 15 entries if necessary)
-    Entity type 1 or 2 can have a taxcode
-    Returns non-temporal data unless otherwise specified;
-    all taxcodes associated with a given NPI
-    """
-    taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
-    if not temporal:
-        taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
-    else:
-        taxcode['month'] = pd.to_datetime(taxcode.month)
-    if entities == 1 or entities == [1]:
-        taxcode = (taxcode.merge(entity.query('entity==1'))
-                          .drop(columns=['entity']))
-    elif entities == 2 or entities == [2]:
-        taxcode = (taxcode.merge(entity.query('entity==2'))
-                          .drop(columns=['entity']))
+def categorize_taxcodes(df):
+    assert set(['entity', 'ptaxcode']).issubset(set(df.columns))
     tax = provider_taxonomies()
     pa = (tax.query('Classification == "Physician Assistant"')
              .TaxonomyCode
@@ -448,11 +432,72 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
                .TaxonomyCode
                .tolist())
     student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
-    taxcode.loc[taxcode.ptaxcode.isin(pa), 'cat'] = 'PA'
-    taxcode.loc[taxcode.ptaxcode.isin(np), 'cat'] = 'NP'
-    taxcode.loc[taxcode.ptaxcode.isin(mddo), 'cat'] = 'MD/DO'
-    taxcode.loc[taxcode.ptaxcode.isin(student), 'cat'] = 'MD/DO Student'
-    return taxcode
+    df.loc[(df.ptaxcode.isin(pa) & df.entity == 1), 'cat'] = 'PA'
+    df.loc[(df.ptaxcode.isin(np) & df.entity == 1), 'cat'] = 'NP'
+    df.loc[(df.ptaxcode.isin(mddo) & df.entity == 1), 'cat'] = 'MD/DO'
+    df.loc[(df.ptaxcode.isin(student)
+            & df.entity == 1), 'cat'] = 'MD/DO Student'
+    return df
+
+
+def get_taxcode(src, npis, entity, entities, temporal=False):
+    """
+    Retrieves taxonomy codes (including all 15 entries if necessary)
+    Entity type 1 or 2 can have a taxcode
+    Returns non-temporal data unless otherwise specified;
+    all taxcodes associated with a given NPI
+    Assigns a category only to entity types 1
+    Removes erroneous entries with the MD student code that
+    later do not become doctors; this procedure is not possible for
+    young trainees
+    """
+    taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
+    if temporal:
+        taxcode_all = taxcode.copy()
+        taxcode_all['month'] = pd.to_datetime(taxcode_all.month)
+        taxcode_all = taxcode_all.merge(entity)
+    if not (temporal and entity in [2, [2]]):
+        taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
+    if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
+        taxcode_e1 = (taxcode.merge(entity.query('entity==1')))
+        taxcode_e1 = categorize_taxcodes(taxcode_e1)
+        training_future = (pd.concat([taxcode_e1,
+                                      pd.get_dummies(taxcode_e1.cat,
+                                                     dummy_na=True)
+                                      ],
+                                     axis=1)
+                             .drop(columns=['cat', 'ptaxcode', 'entity'])
+                             .groupby('npi').max())
+        training_future.columns = ['MDDO', 'MDDOStudent', 'NP', 'PA', 'NaN']
+        not_docs = training_future.query(
+            'MDDOStudent==1 and (NaN+PA+NP)>0 and MDDO==0').reset_index()
+        not_docs['cat'] = "MD/DO Student"
+        taxcode_e1 = (taxcode_e1.merge(not_docs[['npi', 'cat']],
+                                       how='left', indicator=True)
+                                .query('_merge=="left_only"')
+                                .drop(columns='_merge'))
+    if entities in [2, [2]] or entities == [1, 2] or entities == [2, 1]:
+        taxcode_e2 = (taxcode.merge(entity.query('entity==2')))
+
+    if not temporal:
+        if entities in [1, [1]]:
+            return taxcode_e1
+        elif entities in [2, [2]]:
+            return taxcode_e2
+        elif entities == [1, 2] or entities == [2, 1]:
+            return taxcode_e1.append(taxcode_e2)
+    else:
+        if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
+            if entities in [1, [1]]:
+                taxcode_all = taxcode_all.query('entity==1')
+            taxcode_all = categorize_taxcodes(taxcode_all)
+            taxcode_all = (taxcode_all.merge(not_docs[['npi', 'cat']],
+                                             how='left', indicator=True)
+                                      .query('_merge=="left_only"')
+                                      .drop(columns='_merge'))
+            return taxcode_all
+        elif entities in [2, [2]]:
+            return taxcode_all.query('entity==2')
 
 
 def get_cred(src, npis, entity, name_stub):

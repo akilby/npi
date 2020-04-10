@@ -180,4 +180,12 @@ def sanitize_mds():
         ~schools.npi.isin(dups.npi.drop_duplicates())].append(dups).dropna())
     schools.reset_index(drop=True, inplace=True)
     schools['grad_year'] = schools.grad_year.astype(int)
-    return schools
+    assert schools.npi.is_unique
+
+    # Real MDs:
+    from ..utils.globalcache import c
+    from npi.npi import NPI
+    npi = NPI()
+    taxcodes = c.get_taxcode(npi.src, None, npi.entity, [1])
+    mds = taxcodes.query('cat == "MD/DO" or cat == "MD/DO Student"').npi.drop_duplicates()
+    return schools, not_found
