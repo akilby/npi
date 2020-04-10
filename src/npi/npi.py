@@ -249,6 +249,14 @@ class NPI(object):
         self.expanded_fullnames = expand_names_in_sensible_ways(
             f, idvar, firstname, middlename, lastname)
 
+    def get_training_dates(self):
+        if hasattr(self, 'training_dates'):
+            return
+        from .utils.globalcache import c
+        taxcode = c.get_taxcode(self.src, self.npis, self.entity, [1],
+                                temporal=True)
+
+
 
 def purge_nulls(df, var, mergeon):
     '''
@@ -665,22 +673,19 @@ def get_training_dates(taxcode, medical_schools):
     '''
     MD training details for people who show up as MD Student
     And MD in the NPI data
+
+    taxcode needs to only be for entity 1
     '''
     # could add in discontinuities in location during training period
     # would likely represent med school, internship, residency, fellowship
 
     mds = taxcode.query('cat=="MD/DO"').npi.drop_duplicates()
     studs = taxcode.query('cat=="MD/DO Student"').npi.drop_duplicates()
-    fresh_mds = mds[mds.npi.isin(studs)]
-    old_mds = mds[~mds.npi.isin(studs)]
-    trainees = studs[~studs.npi.isin(mds)]
+    fresh_mds = mds[mds.isin(studs)]
+    old_mds = mds[~mds.isin(studs)]
+    trainees = studs[~studs.isin(mds)]
 
-    fresh_mds = (taxcode.query('cat=="MD/DO"')[['npi']]
-                        .drop_duplicates()
-                        .merge(taxcode.query('cat=="MD/DO Student"')
-                               .npi.drop_duplicates()))
     fresh_mds = taxcode.merge(fresh_mds)
-    fresh_mds['month'] = pd.to_datetime(fresh_mds.month)
 
     fresh_mds = (fresh_mds[['npi']]
                  .drop_duplicates()
@@ -704,10 +709,3 @@ def get_training_dates(taxcode, medical_schools):
                         .groupby('npi', as_index=False)
                         .last()
                         .rename(columns={'month': 'last_md_month'}))))
-
-    trainees = (taxcode.query('cat=="MD/DO Student"')[['npi']]
-                       .drop_duplicates()
-                       .merge(taxcode.query('cat=="MD/DO"')
-                              .npi
-                              .drop_duplicates(), how='left', indicator=True)
-                       .query('_merge=="left_only"'))

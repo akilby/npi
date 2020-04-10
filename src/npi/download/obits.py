@@ -1,35 +1,43 @@
+"""
+Ideas: if can't find a hit at first, go to the expanded fullnames, search the
+full web for name + "obituary"
+"""
+
 import glob
 import random
 
 from googleapiclient.discovery import build
-from npi.npi import NPI, src
+from npi.npi import NPI
 from project_management.helper import pickle_dump
-
-npi = NPI(src, entities=1)
-npi.retrieve('removaldate')
-npi.retrieve('ptaxcode')
-npi.retrieve('fullnames')
-
-search_df = (npi.removaldate
-                .merge(npi.ptaxcode
-                          .query('cat=="MD/DO"')
-                          .npi.drop_duplicates())
-                .sort_values('npideactdate'))
 
 __author__ = 'a.kilby@northeastern.edu'
 service = build("customsearch",
                 "v1",
                 developerKey="AIzaSyBsag8cCRT9CDXEQrl7vgZCDLNhE1nq4CU")
 
-npi_list = search_df.npi.tolist()
 
-glob.glob('/work/akilby/npi/raw_obit/*.pkl')
-npi_list = [x for x in npi_list if x != 1467775023 and x != 1487674206]
+def npi_obj():
+    npi = NPI(entities=1)
+    npi.retrieve('removaldate')
+    npi.retrieve('ptaxcode')
+    npi.retrieve('fullnames')
+    return npi
 
 
-########
-# if can't find a hit at first, go to the expanded fullnames, search the full
-# web for name + "obituary"
+def npi_crawl_list(npi):
+    search_df = (npi.removaldate
+                    .merge(npi.ptaxcode
+                              .query('cat=="MD/DO"')
+                              .npi.drop_duplicates())
+                    .sort_values('npideactdate'))
+
+    npi_list = search_df.npi.tolist()
+
+    already_retrieved = [int(x.split('/raw_obit/')[1].split('.pkl')[0])
+                         for x in glob.glob('/work/akilby/npi/raw_obit/*.pkl')]
+
+    npi_list = [x for x in npi_list if x not in already_retrieved]
+    return npi_list
 
 
 def store_obit_results(use_npi, npi):
@@ -66,7 +74,8 @@ def store_obit_results(use_npi, npi):
                     print(d['pubdate'])
 
 
-for i in range(898):
-    random.shuffle(npi_list)
-    use_npi, npi_list = npi_list[:1][0], npi_list[1:]
-    store_obit_results(use_npi, npi)
+def crawl(num, npi, npi_crawl_list):
+    for i in range(num):
+        random.shuffle(npi_crawl_list)
+        use_npi, npi_crawl_list = npi_crawl_list[:1][0], npi_crawl_list[1:]
+        store_obit_results(use_npi, npi)
