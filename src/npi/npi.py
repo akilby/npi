@@ -255,7 +255,7 @@ class NPI(object):
         if hasattr(self, 'training_dates'):
             return
         from .utils.globalcache import c
-        training_details = c.get_training_dates(self.entity)
+        training_details = c.get_training_dates(self.src, self.entity)
         self.training_details = training_details
 
 
@@ -670,7 +670,7 @@ def get_address(src, npis, entity, removaldate, entities, name_stub):
     return address
 
 
-def get_training_dates(entity):
+def get_training_dates(src, entity):
     '''
     MD training details for all MDs and MD Students
 
