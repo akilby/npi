@@ -12,6 +12,8 @@ import re
 import pandas as pd
 from utility_data.taxonomies import provider_taxonomies
 
+from .download.medical_schools import sanitize_mds
+
 src = '/work/akilby/npi/data/'
 
 
@@ -253,9 +255,8 @@ class NPI(object):
         if hasattr(self, 'training_dates'):
             return
         from .utils.globalcache import c
-        taxcode = c.get_taxcode(self.src, self.npis, self.entity, [1],
-                                temporal=True)
-
+        training_dates = c.get_training_dates(self.entity)
+        self.training_dates = training_dates
 
 
 def purge_nulls(df, var, mergeon):
@@ -669,21 +670,35 @@ def get_address(src, npis, entity, removaldate, entities, name_stub):
     return address
 
 
-def get_training_dates(taxcode, medical_schools):
+def get_training_dates(entity):
     '''
-    MD training details for people who show up as MD Student
-    And MD in the NPI data
+    MD training details for all MDs and MD Students
 
-    taxcode needs to only be for entity 1
+    could add in discontinuities in location during training period
+    would likely represent med school, internship, residency, fellowship
     '''
-    # could add in discontinuities in location during training period
-    # would likely represent med school, internship, residency, fellowship
 
+    taxcode = get_taxcode(src, None, entity, [1], temporal=True)
     mds = taxcode.query('cat=="MD/DO"').npi.drop_duplicates()
     studs = taxcode.query('cat=="MD/DO Student"').npi.drop_duplicates()
     fresh_mds = mds[mds.isin(studs)]
     old_mds = mds[~mds.isin(studs)]
     trainees = studs[~studs.isin(mds)]
+
+    schools = sanitize_mds()
+    actually_freshmds = (schools.merge(trainees, how='right')
+                                .dropna()
+                                .query('grad_year<2016')
+                                .npi
+                                .drop_duplicates())
+    fresh_mds = fresh_mds.append(actually_freshmds)
+    trainees = trainees[~trainees.isin(actually_freshmds)]
+    looklike_stilltrainee = (schools.merge(fresh_mds, how='right')
+                                    .dropna()
+                                    .query('grad_year>=2017')
+                                    .npi.drop_duplicates())
+    trainees = trainees.append(looklike_stilltrainee)
+    fresh_mds = fresh_mds[~fresh_mds.isin(looklike_stilltrainee)]
 
     fresh_mds = taxcode.merge(fresh_mds)
 
@@ -693,19 +708,31 @@ def get_training_dates(taxcode, medical_schools):
                         .drop(columns=['seq', 'ptaxcode', 'cat'])
                         .groupby('npi', as_index=False)
                         .first()
-                        .rename(columns={'month': 'first_student_month'})))
+                        .rename(columns={'month': 'first_student_month'})),
+                        how='left')
                  .merge((fresh_mds.query('cat=="MD/DO Student"')
                         .drop(columns=['seq', 'ptaxcode', 'cat'])
                         .groupby('npi', as_index=False)
                         .last()
-                        .rename(columns={'month': 'last_student_month'})))
+                        .rename(columns={'month': 'last_student_month'})),
+                        how='left')
                  .merge((fresh_mds.query('cat=="MD/DO"')
                         .drop(columns=['seq', 'ptaxcode', 'cat'])
                         .groupby('npi', as_index=False)
                         .first()
-                        .rename(columns={'month': 'first_md_month'})))
+                        .rename(columns={'month': 'first_md_month'})),
+                        how='left')
                  .merge((fresh_mds.query('cat=="MD/DO"')
                         .drop(columns=['seq', 'ptaxcode', 'cat'])
                         .groupby('npi', as_index=False)
                         .last()
-                        .rename(columns={'month': 'last_md_month'}))))
+                        .rename(columns={'month': 'last_md_month'})),
+                        how='left'))
+    fresh_mds = fresh_mds.merge(schools, how='left')
+    trainee_dates = (taxcode.drop(columns=['seq', 'ptaxcode', 'cat'])
+                            .drop_duplicates()
+                            .merge(trainees)
+                            .sort_values(['npi', 'month'])
+                            .reset_index(drop=True))
+    old_mds = pd.DataFrame(old_mds).merge(schools, how='left')
+    return trainee_dates, fresh_mds, old_mds

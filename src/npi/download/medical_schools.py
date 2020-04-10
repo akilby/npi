@@ -171,3 +171,13 @@ def update_db(raw_folder, med_school_partials_folder, save=final_data_path):
     if save:
         updated.to_csv(save, index=False)
     return updated, not_found
+
+
+def sanitize_mds():
+    schools = pd.read_csv(final_data_path)
+    dups = schools.dropna()[schools.dropna().npi.duplicated()]
+    schools = (schools[
+        ~schools.npi.isin(dups.npi.drop_duplicates())].append(dups).dropna())
+    schools.reset_index(drop=True, inplace=True)
+    schools['grad_year'] = schools.grad_year.astype(int)
+    return schools
