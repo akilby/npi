@@ -195,7 +195,7 @@ def sanitize_mds(fail_report=False):
 
     # Real MDs:
     from ..utils.globalcache import c
-    from ..npi.npi import NPI
+    from .npi.npi import NPI
     npi = NPI()
     taxcode = c.get_taxcode(npi.src, None, npi.entity, [1])
     mds = (taxcode.query('cat == "MD/DO" or cat == "MD/DO Student"')
