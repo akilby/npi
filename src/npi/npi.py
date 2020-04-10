@@ -255,8 +255,8 @@ class NPI(object):
         if hasattr(self, 'training_dates'):
             return
         from .utils.globalcache import c
-        training_dates = c.get_training_dates(self.entity)
-        self.training_dates = training_dates
+        training_details = c.get_training_dates(self.entity)
+        self.training_details = training_details
 
 
 def purge_nulls(df, var, mergeon):
@@ -735,4 +735,7 @@ def get_training_dates(entity):
                             .sort_values(['npi', 'month'])
                             .reset_index(drop=True))
     old_mds = pd.DataFrame(old_mds).merge(schools, how='left')
-    return trainee_dates, fresh_mds, old_mds
+    training_details = {'trainees': trainee_dates,
+                        'recent_mds': fresh_mds,
+                        'older_mds': old_mds}
+    return training_details
