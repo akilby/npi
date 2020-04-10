@@ -2,8 +2,13 @@ import os
 
 import pandas as pd
 
+from ..utils.utils import wget_checkfirst
+
 WEB_PATH = 'https://data.cms.gov/api/views/%s/rows.csv?accessType=DOWNLOAD&api_foundry=true'
-RAW_DIR = '/work/akilby/npi/raw_opi'
+RAW_DIR_OPI = '/work/akilby/npi/raw_medicare/raw_opi'
+RAW_DIR = '/work/akilby/npi/raw_medicare'
+
+WEB_PATH2 = 'https://data.cms.gov/api/views/fs4p-t5eq/rows.csv?accessType=DOWNLOAD&api_foundry=true'
 
 file_id_dict = {2017: 'sakz-a2rp',
                 2016: '6wg9-kwip',
