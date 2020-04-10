@@ -53,7 +53,7 @@ def store_obit_results(use_npi, npi):
     else:
         use_name = name.pfname.values[0] + ' ' + name.plname.values[0]
 
-    # can remove siterestrict()
+    # can add siterestrict()
     res = service.cse().list(
             q=use_name,
             cx='012963847452809474986:wr7atzbkzti'
