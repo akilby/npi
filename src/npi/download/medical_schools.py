@@ -8,8 +8,6 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from ..utils.utils import longprint
-
 med_school_partials_folder = '/work/akilby/npi/data/medical_schools'
 raw_folder = '/work/akilby/npi/raw_web'
 final_data_path = '/work/akilby/npi/data/medical_schools/medical_schools.csv'
@@ -173,42 +171,3 @@ def update_db(raw_folder, med_school_partials_folder, save=final_data_path):
     if save:
         updated.to_csv(save, index=False)
     return updated, not_found
-
-
-def sanitize_mds(fail_report=False):
-    '''
-    Note: this exercise uncovers the fact that there are some
-    real MDs who are not using MD taxcodes.
-    A more thorough fix would look at their credential string as well, and go
-    back and make sure those were all crawled for schools as well
-    Many of the below fails are actually podiatrists and chiropractors and
-    others who apparently have schooling listed on their licenses. those
-    are appropriate to throw out.
-    '''
-    schools = pd.read_csv(final_data_path)
-    dups = schools.dropna()[schools.dropna().npi.duplicated()]
-    schools = (schools[
-        ~schools.npi.isin(dups.npi.drop_duplicates())].append(dups).dropna())
-    schools.reset_index(drop=True, inplace=True)
-    schools['grad_year'] = schools.grad_year.astype(int)
-    assert schools.npi.is_unique
-
-    # Real MDs:
-    from ..utils.globalcache import c
-    from .npi.npi import NPI
-    npi = NPI()
-    taxcode = c.get_taxcode(npi.src, None, npi.entity, [1])
-    mds = (taxcode.query('cat == "MD/DO" or cat == "MD/DO Student"')
-                  .npi.drop_duplicates())
-    schools2 = schools.merge(mds, how='right', indicator=True)
-    matches = (schools2.query('_merge=="both"')
-                       .drop(columns='_merge')
-                       .assign(grad_year=lambda x: x.grad_year.astype(int)))
-    not_found = schools2.query('_merge=="right_only"').npi.drop_duplicates()
-    rept = (schools.merge(matches, how='left', indicator=True)
-                   .query('_merge!="both"')
-                   .medical_school_upper
-                   .value_counts())
-    if fail_report:
-        longprint(rept)
-    return matches, not_found

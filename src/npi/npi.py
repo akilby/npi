@@ -10,9 +10,9 @@ import os
 import re
 
 import pandas as pd
+from download.medical_schools import final_data_path as med_school_path
 from utility_data.taxonomies import provider_taxonomies
-
-from .download.medical_schools import sanitize_mds
+from utils.utils import longprint
 
 src = '/work/akilby/npi/data/'
 
@@ -730,7 +730,7 @@ def get_training_dates(src, entity):
     old_mds = mds[~mds.isin(studs)]
     trainees = studs[~studs.isin(mds)]
 
-    schools = sanitize_mds()
+    schools = sanitize_medical_schools()
     actually_freshmds = (schools.merge(trainees, how='right')
                                 .dropna()
                                 .query('grad_year<2016')
@@ -784,3 +784,42 @@ def get_training_dates(src, entity):
                         'recent_mds': fresh_mds,
                         'older_mds': old_mds}
     return training_details
+
+
+def sanitize_medical_schools(med_school_path=med_school_path,
+                             fail_report=False):
+    '''
+    Note: this exercise uncovers the fact that there are some
+    real MDs who are not using MD taxcodes.
+    A more thorough fix would look at their credential string as well, and go
+    back and make sure those were all crawled for schools as well
+    Many of the below fails are actually podiatrists and chiropractors and
+    others who apparently have schooling listed on their licenses. those
+    are appropriate to throw out.
+    '''
+    schools = pd.read_csv(med_school_path)
+    dups = schools.dropna()[schools.dropna().npi.duplicated()]
+    schools = (schools[
+        ~schools.npi.isin(dups.npi.drop_duplicates())].append(dups).dropna())
+    schools.reset_index(drop=True, inplace=True)
+    schools['grad_year'] = schools.grad_year.astype(int)
+    assert schools.npi.is_unique
+
+    # Real MDs:
+    from ..utils.globalcache import c
+    npi = NPI()
+    taxcode = c.get_taxcode(npi.src, None, npi.entity, [1])
+    mds = (taxcode.query('cat == "MD/DO" or cat == "MD/DO Student"')
+                  .npi.drop_duplicates())
+    schools2 = schools.merge(mds, how='right', indicator=True)
+    matches = (schools2.query('_merge=="both"')
+                       .drop(columns='_merge')
+                       .assign(grad_year=lambda x: x.grad_year.astype(int)))
+    not_found = schools2.query('_merge=="right_only"').npi.drop_duplicates()
+    rept = (schools.merge(matches, how='left', indicator=True)
+                   .query('_merge!="both"')
+                   .medical_school_upper
+                   .value_counts())
+    if fail_report:
+        longprint(rept)
+    return matches, not_found
