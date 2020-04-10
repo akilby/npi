@@ -5,6 +5,7 @@ full web for name + "obituary"
 
 import glob
 import random
+import sys
 
 from googleapiclient.discovery import build
 from npi.npi import NPI
@@ -53,7 +54,7 @@ def store_obit_results(use_npi, npi):
         use_name = name.pfname.values[0] + ' ' + name.plname.values[0]
 
     # can remove siterestrict()
-    res = service.cse().siterestrict().list(
+    res = service.cse().list(
             q=use_name,
             cx='012963847452809474986:wr7atzbkzti'
         ).execute()
@@ -79,3 +80,8 @@ def crawl(num, npi, npi_crawl_list):
         random.shuffle(npi_crawl_list)
         use_npi, npi_crawl_list = npi_crawl_list[:1][0], npi_crawl_list[1:]
         store_obit_results(use_npi, npi)
+
+
+def main():
+    npi = npi_obj()
+    crawl(sys.argv[1], npi, npi_crawl_list(npi))
