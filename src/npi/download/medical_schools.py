@@ -8,7 +8,6 @@ import pandas as pd
 import requests
 from bs4 import BeautifulSoup
 
-from ..npi.npi import NPI
 from ..utils.utils import longprint
 
 med_school_partials_folder = '/work/akilby/npi/data/medical_schools'
@@ -196,6 +195,7 @@ def sanitize_mds(fail_report=False):
 
     # Real MDs:
     from ..utils.globalcache import c
+    from ..npi.npi import NPI
     npi = NPI()
     taxcode = c.get_taxcode(npi.src, None, npi.entity, [1])
     mds = (taxcode.query('cat == "MD/DO" or cat == "MD/DO Student"')
