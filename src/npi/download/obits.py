@@ -85,3 +85,7 @@ def crawl(num, npi, npi_crawl_list):
 def main():
     npi = npi_obj()
     crawl(sys.argv[1], npi, npi_crawl_list(npi))
+
+
+if __name__ == '__main__':
+    main()
