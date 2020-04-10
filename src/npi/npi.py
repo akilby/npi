@@ -10,9 +10,10 @@ import os
 import re
 
 import pandas as pd
-from download.medical_schools import final_data_path as med_school_path
 from utility_data.taxonomies import provider_taxonomies
-from utils.utils import longprint
+
+from .download.medical_schools import final_data_path as med_school_path
+from .utils.utils import longprint
 
 src = '/work/akilby/npi/data/'
 
