@@ -1,14 +1,14 @@
-import glob
-import os
-import sys
-from pprint import pprint
+# import glob
+# import os
+# import sys
+# from pprint import pprint
 
-import pandas as pd
+# import pandas as pd
 
-from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
-                         USE_VAR_LIST_DICT_REVERSE)
-from ..download.nppes import nppes_month_list
-from ..utils.utils import month_name_to_month_num
+# from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
+#                          USE_VAR_LIST_DICT_REVERSE)
+# from ..download.nppes import nppes_month_list
+# from ..utils.utils import month_name_to_month_num
 
 
 def get_filepaths_from_dissemination_zips(folder):
@@ -322,4 +322,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    print('lol')
+    # main()
