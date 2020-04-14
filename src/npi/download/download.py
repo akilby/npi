@@ -19,7 +19,7 @@ import requests
 import wget
 
 from ..constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
-from ..utils.utils import unzip
+from ..utils.utils import unzip_checkfirst
 
 
 def nppes_month_list():
@@ -36,6 +36,7 @@ def nppes_month_list():
 
 def nppes_weekly_update_list():
     """
+    Lists the weekly zip files now on the server
     """
     cms = 'https://download.cms.gov/nppes'
     return [cms +
@@ -150,7 +151,8 @@ def main():
                  for key, val in result_list.items() if val[0]]
     zipfiles2 = [os.path.join(RAW_DATA_DIR, wget.detect_filename(key))
                  for key, val in weeklies.items() if val]
-    [unzip(z, os.path.splitext(z)[0]) for z in zipfiles1 + zipfiles2]
+    zipfiles = zipfiles1 + zipfiles2
+    [unzip_checkfirst(z, os.path.splitext(z)[0]) for z in zipfiles]
 
 
 if __name__ == '__main__':
