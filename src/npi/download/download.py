@@ -12,9 +12,6 @@ Downloads the weekly updates
 import calendar
 import os
 import urllib.error
-import warnings
-import zipfile
-import zlib
 from pprint import pprint
 
 import pandas as pd
@@ -22,6 +19,7 @@ import requests
 import wget
 
 from ..constants import DISSEM_PATHS, NBER_PATH, RAW_DATA_DIR, USE_VAR_LIST
+from ..utils.utils import unzip
 
 
 def nppes_month_list():
@@ -124,18 +122,6 @@ def wget_data_dissemination_zips(year, month, to_dir):
         i += 1
     path_return = path if found else None
     return found, path_return
-
-
-def unzip(path, to_dir):
-    """
-    """
-    print('Unzipping File %s' % path, end=' ')
-    try:
-        with zipfile.ZipFile(path, 'r') as zip_ref:
-            zip_ref.extractall(to_dir)
-            print('... Unzipped')
-    except(zlib.error):
-        warnings.warn('Unzipping %s failed' % path)
 
 
 def main():

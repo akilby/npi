@@ -4,6 +4,10 @@ NBER_PATH = 'https://data.nber.org/npi/byvar'
 RAW_DATA_DIR = '/work/akilby/npi/raw'
 DATA_DIR = '/work/akilby/npi/data'
 
+RAW_PC_DIR = '/work/akilby/npi/raw_medicare/physician_compare'
+PC_UPDATE_URL = ('https://data.medicare.gov/api/views/mj5m-pzi6/'
+                 'rows.csv?accessType=DOWNLOAD&sorting=true')
+
 DISSEM_PATHS = ['http://download.cms.gov/nppes/',
                 'https://data.nber.org/npi/%s/',
                 'https://data.nber.org/npi/backfiles/']
@@ -15,6 +19,7 @@ USE_MONTH_LIST = ['Jan', 'Feb', 'March', 'April', 'May', 'June',
 USE_VAR_LIST_DICT = {
     'npi': 'NPI',
     'entity': 'Entity Type Code',
+    'lastupdate': 'Last Update Date',
     'pcredential': 'Provider Credential Text',
     'pcredentialoth':  'Provider Other Credential Text',
     'ptaxcode': ['Healthcare Provider Taxonomy Code_1',
@@ -349,6 +354,7 @@ DTYPES = {
     'npi': 'int',
     'entity': "Int64",
     'seq': 'int',
+    'lastupdate': 'datetime64[ns]',
     'ptaxcode': 'string',
     'PPRIMTAX': 'string',
     'PTAXGROUP': 'string',

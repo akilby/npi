@@ -12,6 +12,12 @@ med_school_partials_folder = '/work/akilby/npi/data/medical_schools'
 raw_folder = '/work/akilby/npi/raw_web'
 final_data_path = '/work/akilby/npi/data/medical_schools/medical_schools.csv'
 
+# # Note: this seems to come from physician compare!
+# # The new file seems to have another 9,400 physicians
+# # can also check the "credential" field for any physicians
+# # I missed
+# # Also archived versions of physician compare
+
 
 class HTMLTableParser:
 
