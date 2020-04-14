@@ -7,7 +7,7 @@ import pandas as pd
 
 from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
                          USE_VAR_LIST_DICT_REVERSE)
-from ..download.download import nppes_month_list
+from ..download.nppes import nppes_month_list
 from ..utils.utils import month_name_to_month_num
 
 
