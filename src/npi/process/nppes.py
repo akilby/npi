@@ -269,12 +269,13 @@ def main_process_variable(variable, update):
     # Should figure out NPPES_Data_Dissemination_March_2011 because it's weird;
     # deleting for now
     if not update:
+        print(f'Making new: {variable}')
         searchlist = [x for x in nppes_month_list() if x != (2011, 3)]
         df = process_variable(RAW_DATA_DIR, variable, searchlist)
         df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                   index=False)
     else:
-        print('Updating:')
+        print(f'Updating: {variable}')
         df = pd.read_csv(os.path.join(DATA_DIR, '%s.csv' % variable))
         df['month'] = pd.to_datetime(df.month)
         last_month = max(list(df.month.value_counts().index))
@@ -289,7 +290,31 @@ def main_process_variable(variable, update):
             dim1 = df.loc[df.month >= df2.month.min()].shape[0]
             dim2 = df.loc[df.month >= df2.month.min()].merge(
                 df2, on=['npi', 'month']).shape[0]
-            assert dim1 == dim2
+            try:
+                # check 1: are all the updated entries in df, an exact subset
+                # of df2. They may not be because the end of the month
+                # weekly updates may have been recoded as the next month's data
+                # in the monthly update.
+                assert dim1 == dim2
+            except AssertionError:
+                # If that doesn't work, check that when dropping month
+                # indicators, almost everything not matching is from the
+                # updated data. There can be a small number of entries
+                # (which will ultimately be lost) that do not match - these
+                # are data from weekly updates that don't persist to the
+                # monthly probably because people change their information
+                # after making a mistake on the application
+                test2 = (df.loc[df.month >= df2.month.min()]
+                         .drop(columns='month')
+                         .dropna()
+                         .drop_duplicates()
+                         .merge(df2.drop(columns='month')
+                                   .dropna()
+                                   .drop_duplicates(),
+                                how='outer', indicator=True))
+                vc = pd.DataFrame(test2._merge.value_counts())
+                assert (vc.query('index=="left_only"').values[0][0] /
+                        vc.query('index=="both"').values[0][0] < 0.001)
             df = df.loc[df.month < df2.month.min()].append(df2)
             assert (df[['npi', 'month']].drop_duplicates().shape[0]
                     == df.shape[0])
