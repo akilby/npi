@@ -311,8 +311,10 @@ def update_all(max_jobs=6):
     list_of_jobs = []
     varl = USE_VAR_LIST.copy()
     while len(varl) > 0:
-        while sum([x.query_details() != 0 for x in list_of_jobs]) < max_jobs:
+        while (sum([x.query_details(pause=True) != 0 for x in list_of_jobs])
+               < max_jobs):
             u = varl.pop(0)
+            print(f'Running: {u}')
             commands = ('from npi.process.nppes import main_process_variable\n'
                         'main_process_variable("%s", True)' % u)
             r = RunScript(commands, program='python', partition='reservation',
