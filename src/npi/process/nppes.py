@@ -8,7 +8,7 @@ import pandas as pd
 from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
                          USE_VAR_LIST_DICT_REVERSE)
 from ..download.nppes import nppes_month_list
-from ..utils.utils import month_name_to_month_num
+from ..utils.utils import coerce_dtypes, month_name_to_month_num
 
 
 def get_filepaths_from_dissemination_zips(folder):
@@ -96,29 +96,9 @@ def get_filepaths_from_single_variable_files(variable, folder, noisily=True):
     return file_dict
 
 
-def coerce_dtypes(col, orig_dtype, final_dtype):
-    '''
-    Converts to destination dtype and runs some sanity checks
-    to make sure no harm has been done in the conversion
-    '''
-    new_col = col.astype(final_dtype)
-
-    # Checks countable nulls are maintained
-    assert new_col.isna().sum() == col.isna().sum()
-
-    if final_dtype.lower().startswith('int'):
-        # This checks numeric types are actually integers and I'm not
-        # asserting/enforcing rounding
-        assert (new_col.astype(final_dtype)
-                       .astype(float)
-                       .equals(new_col.astype(float)))
-
-    assert all(new_col.index == col.index)
-    return new_col
-
-
 def convert_dtypes(df):
     '''
+    Note: should move to generic version found in utils
     '''
     current_dtypes = {x: 'int' for x in df.select_dtypes('int').columns}
     for t in ['object', ['float32', 'float64'], 'datetime', 'string']:

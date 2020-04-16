@@ -85,3 +85,59 @@ def unzip_checkfirst(path, to_dir, destructive=False):
         unzip(path, to_dir)
     else:
         print('Path %s already appears unzipped to %s' % (path, to_dir))
+
+
+def singleton(list_or_set):
+    assert len(list_or_set) == 1
+    return list(list_or_set)[0]
+
+
+def coerce_dtypes(col, orig_dtype, final_dtype):
+    '''
+    Converts to destination dtype and runs some sanity checks
+    to make sure no harm has been done in the conversion
+    '''
+    new_col = col.astype(final_dtype)
+
+    # Checks countable nulls are maintained
+    assert new_col.isna().sum() == col.isna().sum()
+
+    if final_dtype.lower().startswith('int'):
+        # This checks numeric types are actually integers and I'm not
+        # asserting/enforcing rounding
+        assert (new_col.astype(final_dtype)
+                       .astype(float)
+                       .equals(new_col.astype(float)))
+
+    assert all(new_col.index == col.index)
+    return new_col
+
+
+def convert_dtypes(df, dtypes):
+    '''
+    '''
+    current_dtypes = {x: 'int' for x in df.select_dtypes('int').columns}
+    for t in ['object', ['float32', 'float64'], 'datetime', 'string']:
+        current_dtypes.update({x: t for x in df.select_dtypes(t).columns})
+    for col in df.columns:
+        final_dtype = dtypes[col]
+        if (current_dtypes[col] != final_dtype and
+                final_dtype not in current_dtypes[col]):
+            try:
+                df = df.assign(**{col: coerce_dtypes(df[col],
+                                                     current_dtypes[col],
+                                                     final_dtype)})
+            except ValueError as err:
+                if final_dtype == 'string':
+                    newcol = coerce_dtypes(df[col], current_dtypes[col], 'str')
+                    newcol = coerce_dtypes(newcol, 'str', 'string')
+                else:
+                    raise ValueError("{0}".format(err))
+    return df
+
+
+def force_integer(x):
+    try:
+        return int(x)
+    except ValueError:
+        return None

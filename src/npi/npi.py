@@ -124,6 +124,20 @@ class NPI(object):
         self.pcredentialoth = c.get_cred(
             self.src, self.npis, self.entity, 'pcredentialoth')
 
+    def get_PLICSTATE(self):
+        if hasattr(self, 'PLICSTATE') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.PLICSTATE = c.get_lic(
+            self.src, self.npis, self.entity, 'PLICSTATE', temporal=True)
+
+    def get_PLICNUM(self):
+        if hasattr(self, 'PLICNUM') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.PLICNUM = c.get_lic(
+            self.src, self.npis, self.entity, 'PLICNUM', temporal=True)
+
     def get_plocline1(self):
         if hasattr(self, 'plocline1'):
             return
@@ -214,6 +228,12 @@ class NPI(object):
                                                           .str.strip()
                                                           .str.upper())
         self.credentials = credentials
+
+    def get_licenses(self):
+        if hasattr(self, 'credentials') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.licenses = c.get_licenses(self.src, self.npis, self.entity)
 
     def get_fullnames(self):
         if hasattr(self, 'fullnames') or self.entities in [2, [2]]:
@@ -499,6 +519,24 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
             return taxcode_all
         elif entities in [2, [2]]:
             return taxcode_all.query('entity==2')
+
+
+def get_lic(src, npis, entity, name_stub, temporal=False):
+    """
+    Retrieves PLICSTATE, PLICNUM
+    """
+    lic = read_csv_npi(os.path.join(src, f'{name_stub}.csv'), npis)
+    if not temporal:
+        lic = lic[['npi', name_stub]].drop_duplicates()
+    return lic
+
+
+def get_licenses(src, npis, entity):
+    from .utils.globalcache import c
+    licstate = c.get_lic(src, npis, entity, 'PLICSTATE', temporal=True)
+    licnum = c.get_lic(src, npis, entity, 'PLICNUM', temporal=True)
+    df = licstate.merge(licnum, how='outer')
+    return df[['npi', 'PLICNUM', 'PLICSTATE']].drop_duplicates()
 
 
 def get_cred(src, npis, entity, name_stub):
