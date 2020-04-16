@@ -5,8 +5,8 @@ from pprint import pprint
 
 import pandas as pd
 
-from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST_DICT,
-                         USE_VAR_LIST_DICT_REVERSE)
+from ..constants import (DATA_DIR, DTYPES, RAW_DATA_DIR, USE_VAR_LIST,
+                         USE_VAR_LIST_DICT, USE_VAR_LIST_DICT_REVERSE)
 from ..download.nppes import nppes_month_list
 from ..utils.utils import coerce_dtypes, month_name_to_month_num
 
@@ -294,11 +294,30 @@ def main_process_variable(variable, update):
                       index=False)
 
 
-def main():
+def main_single():
     variable = sys.argv[1]
     update = sys.argv[2] if len(sys.argv) > 2 else False
     update = update if (update == 'True' or update == 'Force') else False
     main_process_variable(variable, update)
+
+
+def update_all(max_jobs=6):
+    """Must be run on a login node, submits multiple jobs"""
+    from jobs.run import RunScript
+    list_of_jobs = []
+    varl = USE_VAR_LIST.copy()
+    while len(varl) > 0:
+        while sum([x.query_details() != 0 for x in list_of_jobs]) < max_jobs:
+            u = varl.pop(0)
+            commands = ('from npi.process.nppes import main_process_variable\n'
+                        'main_process_variable("%s", True)' % u)
+            r = RunScript(commands, program='python', partition='reservation',
+                          reservation='kilby', procs=26).run()
+            list_of_jobs.append(r)
+
+
+def main():
+    update_all()
 
 
 if __name__ == '__main__':
