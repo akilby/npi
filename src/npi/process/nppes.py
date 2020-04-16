@@ -183,20 +183,21 @@ def read_and_process_weekly_updates(folder, variable):
     """
     """
     filepaths = which_weekly_dissemination_zips_are_updates(folder)
-    updates = pd.concat(
-        [process_filepath_to_df(f[1], variable).assign(
-            week=pd.to_datetime(f[0][0]))
-         for f in filepaths])
-    updates['month'] = (pd.to_datetime(updates.week.dt.year.astype(str)
-                        + '-'
-                        + updates.week.dt.month.astype(str) + '-' + '1'))
-    updates = (updates.dropna()
-                      .groupby(['npi', 'month'])
-                      .max()
-                      .reset_index()
-                      .merge(updates)
-                      .drop(columns='week'))
-    return updates
+    if filepaths:
+        updates = pd.concat(
+            [process_filepath_to_df(f[1], variable).assign(
+                week=pd.to_datetime(f[0][0]))
+             for f in filepaths])
+        updates['month'] = (pd.to_datetime(updates.week.dt.year.astype(str)
+                            + '-'
+                            + updates.week.dt.month.astype(str) + '-' + '1'))
+        updates = (updates.dropna()
+                          .groupby(['npi', 'month'])
+                          .max()
+                          .reset_index()
+                          .merge(updates)
+                          .drop(columns='week'))
+        return updates
 
 
 def process_filepath_to_df(file_path, variable):
@@ -251,13 +252,16 @@ def process_variable(folder, variable, searchlist, final_weekly_updates=True):
     df = pd.concat(df_list, axis=0) if df_list else None
     if df_list and final_weekly_updates:
         u = read_and_process_weekly_updates(folder, variable)
-        df = df.merge(u, on=['npi', 'month'], how='outer', indicator=True)
-        df.loc[df._merge == "right_only",
-               '%s_x' % variable] = df['%s_y' % variable]
-        df.loc[df._merge == "both", '%s_x' % variable] = df['%s_y' % variable]
-        df = (df.drop(columns=['_merge', '%s_y' % variable])
-                .rename(columns={'%s_x' % variable: variable}))
-        assert df[['npi', 'month']].drop_duplicates().shape[0] == df.shape[0]
+        if u:
+            df = df.merge(u, on=['npi', 'month'], how='outer', indicator=True)
+            df.loc[df._merge == "right_only",
+                   '%s_x' % variable] = df['%s_y' % variable]
+            df.loc[df._merge == "both",
+                   '%s_x' % variable] = df['%s_y' % variable]
+            df = (df.drop(columns=['_merge', '%s_y' % variable])
+                    .rename(columns={'%s_x' % variable: variable}))
+            assert (df[['npi', 'month']].drop_duplicates().shape[0]
+                    == df.shape[0])
     return df
 
 
