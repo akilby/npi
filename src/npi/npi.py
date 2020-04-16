@@ -125,14 +125,14 @@ class NPI(object):
             self.src, self.npis, self.entity, 'pcredentialoth')
 
     def get_PLICSTATE(self):
-        if hasattr(self, 'PLICSTATE') or self.entities in [2, [2]]:
+        if hasattr(self, 'PLICSTATE'):
             return
         from .utils.globalcache import c
         self.PLICSTATE = c.get_lic(
             self.src, self.npis, self.entity, 'PLICSTATE', temporal=True)
 
     def get_PLICNUM(self):
-        if hasattr(self, 'PLICNUM') or self.entities in [2, [2]]:
+        if hasattr(self, 'PLICNUM'):
             return
         from .utils.globalcache import c
         self.PLICNUM = c.get_lic(
