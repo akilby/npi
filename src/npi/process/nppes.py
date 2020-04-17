@@ -209,10 +209,14 @@ def process_filepath_to_df(file_path, variable):
     """
     is_dissem_file = len(file_path.split('/')) > 6
     is_dta_file = os.path.splitext(file_path)[1] == '.dta'
+    is_pl_file = ('pl_pfile_' in file_path) and is_dissem_file
     collist, d_use = column_details(variable, is_dissem_file, is_dta_file)
     df = (pd.read_csv(file_path, usecols=collist, dtype=d_use)
           if file_path.endswith('.csv')
           else pd.read_stata(file_path, columns=collist))
+    if is_pl_file:
+        df = (pd.concat([df, df.groupby('NPI').cumcount() + 1], axis=1)
+                .rename(columns={0: 'seq'}))
     if (not is_dissem_file
             and variable not in df.columns
             and variable.lower() in df.columns):
