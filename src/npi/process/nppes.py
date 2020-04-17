@@ -286,10 +286,11 @@ def main_process_variable(variable, update):
         print('updating (destroying and remaking) months->', searchlist)
         if searchlist != [] or update == 'Force':
             df2 = process_variable(RAW_DATA_DIR, variable, searchlist)
+            idcols = [x for x in df.columns if x in ['npi', 'month', 'seq']]
             # df = pd.concat([df, df2], axis=0)
             dim1 = df.loc[df.month >= df2.month.min()].shape[0]
             dim2 = df.loc[df.month >= df2.month.min()].merge(
-                df2, on=['npi', 'month']).shape[0]
+                df2, on=idcols).shape[0]
             try:
                 # check 1: are all the updated entries in df, an exact subset
                 # of df2. They may not be because the end of the month
@@ -297,7 +298,7 @@ def main_process_variable(variable, update):
                 # in the monthly update.
                 assert dim1 == dim2
             except AssertionError:
-                # If that doesn't work, check that when dropping month
+                # check 2: If that doesn't work, check that when dropping month
                 # indicators, almost everything not matching is from the
                 # updated data. There can be a small number of entries
                 # (which will ultimately be lost) that do not match - these
@@ -316,7 +317,7 @@ def main_process_variable(variable, update):
                 assert (vc.query('index=="left_only"').values[0][0] /
                         vc.query('index=="both"').values[0][0] < 0.001)
             df = df.loc[df.month < df2.month.min()].append(df2)
-            assert (df[['npi', 'month']].drop_duplicates().shape[0]
+            assert (df[idcols].drop_duplicates().shape[0]
                     == df.shape[0])
             df = df.query('month != "2011-03-01"')
             df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
@@ -334,7 +335,8 @@ def update_all(max_jobs=6):
     """Must be run on a login node, submits multiple jobs"""
     from jobs.run import RunScript
     list_of_jobs = []
-    varl = USE_VAR_LIST.copy()
+    # varl = USE_VAR_LIST.copy()
+    varl = ['entity', 'npideactdate', 'npireactdate', 'orgsubpart', 'OTHPID', 'OTHPIDST', 'OTHPIDTY', 'penumdate', 'PLICNUM', 'PLICSTATE', 'ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename', 'ploc2tel', 'ploc2zip', 'plocline1', 'plocstatename', 'ploctel', 'pmnameoth', 'PPRIMTAX', 'ptaxcode', 'PTAXGROUP', 'resident_address', 'residents_nber']
     while len(varl) > 0:
         while (sum([x.query_details(pause=True) != 0 for x in list_of_jobs])
                < max_jobs):
