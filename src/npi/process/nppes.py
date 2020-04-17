@@ -278,6 +278,10 @@ def main_process_variable(variable, update):
         print(f'Updating: {variable}')
         df = pd.read_csv(os.path.join(DATA_DIR, '%s.csv' % variable))
         df['month'] = pd.to_datetime(df.month)
+        if DTYPES[variable] == 'datetime64[ns]':
+            df[variable] = pd.to_datetime(df[variable])
+        else:
+            df[variable] = df[variable].astype(DTYPES[variable])
         last_month = max(list(df.month.value_counts().index))
         searchlist = [x for x in nppes_month_list() if
                       (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
@@ -322,6 +326,7 @@ def main_process_variable(variable, update):
             df = df.query('month != "2011-03-01"')
             df.to_csv(os.path.join(DATA_DIR, '%s.csv' % variable),
                       index=False)
+            print(f'Variable {variable} completed!')
 
 
 def main_single():
@@ -336,9 +341,12 @@ def update_all(max_jobs=6):
     from jobs.run import RunScript
     list_of_jobs = []
     # varl = USE_VAR_LIST.copy()
-    varl = ['entity', 'npideactdate', 'npireactdate', 'orgsubpart', 'OTHPID', 'OTHPIDST', 'OTHPIDTY', 'penumdate', 'PLICNUM', 'PLICSTATE', 'ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename', 'ploc2tel', 'ploc2zip', 'plocline1', 'plocstatename', 'ploctel', 'pmnameoth', 'PPRIMTAX', 'ptaxcode', 'PTAXGROUP', 'resident_address', 'residents_nber']
+    varl = ['npireactdate', 'penumdate',
+            'ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename',
+            'ploc2tel', 'ploc2zip', 'plocline1', 'plocstatename', 'ploctel',
+            'pmnameoth', 'PPRIMTAX', 'ptaxcode', 'PTAXGROUP']
     while len(varl) > 0:
-        while (sum([x.query_details(pause=True) != 0 for x in list_of_jobs])
+        while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
                < max_jobs):
             u = varl.pop(0)
             print(f'Running: {u}')
