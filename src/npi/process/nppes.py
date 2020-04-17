@@ -38,6 +38,8 @@ def get_weekly_dissemination_zips(folder):
     '''
     Each weekly update folder contains a large / bulk data file of the format
     npidata_pfile_20200323-20200329, representing the week covered
+
+    Will need to later add functionality for weekly updates for ploc2 files
     '''
     zip_paths = os.path.join(folder, 'NPPES_Data_Dissemination*')
     stub = os.path.join(folder, 'NPPES_Data_Dissemination_')
@@ -56,6 +58,7 @@ def get_weekly_dissemination_zips(folder):
 
 def which_weekly_dissemination_zips_are_updates(folder):
     """
+    Will need to later add functionality for weekly updates for ploc2 files
     """
     last_monthly = max([pd.to_datetime(val.split('-')[1]
                                           .split('.csv')[0]
@@ -73,6 +76,7 @@ def get_secondary_loc_filepaths_from_dissemination_zips(folder):
     zip_paths = os.path.join(folder, 'NPPES_Data_Dissemination*')
     stub = os.path.join(folder, 'NPPES_Data_Dissemination_')
     possbl = list(set(glob.glob(zip_paths + '/**/pl_pfile_*', recursive=True)))
+    possbl = [x for x in possbl if 'Weekly' not in x]
     paths = {(x.partition(stub)[2].split('/')[0].split('_')[1],
               str(month_name_to_month_num(
                x.partition(stub)[2].split('/')[0].split('_')[0]))): x
@@ -338,13 +342,13 @@ def main_single():
 
 def update_all(max_jobs=6):
     """Must be run on a login node, submits multiple jobs"""
+    # ploc2 files aren't updating because the weekly updates aren't
+    # being properly separated out
     from jobs.run import RunScript
     list_of_jobs = []
     # varl = USE_VAR_LIST.copy()
-    varl = ['npireactdate', 'penumdate',
-            'ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename',
-            'ploc2tel', 'ploc2zip', 'plocline1', 'plocstatename', 'ploctel',
-            'pmnameoth', 'PPRIMTAX', 'ptaxcode', 'PTAXGROUP']
+    varl = ['ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename',
+            'ploc2tel', 'ploc2zip', 'ploctel']
     while len(varl) > 0:
         while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
                < max_jobs):
