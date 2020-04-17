@@ -104,13 +104,18 @@ def convert_dtypes(df):
     '''
     Note: should move to generic version found in utils
     '''
-    current_dtypes = {x: 'int' for x in df.select_dtypes('int').columns}
-    for t in ['object', ['float32', 'float64'], 'datetime', 'string']:
+    # weird fix required for bug in select_dtypes
+    ints_init = (df.dtypes
+                   .reset_index()[df.dtypes.reset_index()[0] == int]['index']
+                   .values.tolist())
+    current_dtypes = {x: 'int' for x in ints_init}
+    for t in ['int', 'object', ['float32', 'float64'], 'datetime', 'string']:
         current_dtypes.update({x: t for x in df.select_dtypes(t).columns})
     dissem_file = (not set(current_dtypes.keys()).issubset(DTYPES.keys()))
     for col in df.columns:
         final_dtype = (DTYPES[col] if not dissem_file
-                       else DTYPES[USE_VAR_LIST_DICT_REVERSE[col]])
+                       else DTYPES[{**USE_VAR_LIST_DICT_REVERSE,
+                                    **{'seq': 'seq'}}[col]])
         if (current_dtypes[col] != final_dtype and
                 final_dtype not in current_dtypes[col]):
             try:
