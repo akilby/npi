@@ -242,7 +242,8 @@ def reformat(df, variable, is_dissem_file):
         df = pd.wide_to_long(df, [stb], i="NPI", j="seq").dropna()
         df = df.reset_index().rename(columns={'NPI': 'npi', stb: variable})
     elif is_dissem_file:
-        df = df.rename(columns={x: USE_VAR_LIST_DICT_REVERSE[x]
+        df = df.rename(columns={x: {**USE_VAR_LIST_DICT_REVERSE,
+                                    **{'seq': 'seq'}}[x]
                                 for x in df.columns})
     return df
 
