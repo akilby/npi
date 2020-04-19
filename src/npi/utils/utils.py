@@ -151,3 +151,16 @@ def force_integer_blanks(x, forcematch):
             return None
         else:
             raise ValueError
+
+
+def isid(df, index_cols, noisily=False, assertion=True):
+    print_string = (f'Index columns {index_cols}%s'
+                    ' uniquely identify the observations')
+    if df.set_index(index_cols).index.is_unique:
+        if noisily:
+            print(print_string % '')
+    else:
+        if assertion:
+            raise AssertionError(print_string % ' do not')
+        else:
+            print(print_string % ' do not')
