@@ -117,7 +117,9 @@ class ReadPhysicianCompare(object):
         return df
 
 
-def process_vars(variables, drop_duplicates=True, date_var=False):
+def physician_compare_select_vars(variables,
+                                  drop_duplicates=True,
+                                  date_var=False):
     """
     Pulls in physician compare data by variables, appends
     if a variable hasn't been added to DTYPES, then it will not run
