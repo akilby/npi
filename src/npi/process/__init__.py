@@ -66,6 +66,11 @@ DTYPES = {'NPI': 'int',
           'Medical school name': 'string',
           'Group Practice PAC ID': 'Int64',
           'Number of Group Practice members': 'Int64',
+          'Primary specialty': 'string',
+          'Secondary specialty 1': 'string',
+          'Secondary specialty 2': 'string',
+          'Secondary specialty 3': 'string',
+          'Secondary specialty 4': 'string'
           }
 
 

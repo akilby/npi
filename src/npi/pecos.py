@@ -1,45 +1,90 @@
+"""
+
+elig:
+drop if old grad year, or if they drop out after high historical claims (if
+only a few claims, maybe cant determine)"
+people can move to private practice..."
+
+could also try; retire them when they hit retirement age, unless evidence
+they still practice
+
+"""
+
+import pandas as pd
+
+from .download.medical_schools import final_data_path as med_school_path
 from .process.medicare import part_b_files, part_d_files
-from .process.physician_compare import process_vars
+from .process.physician_compare import physician_compare_select_vars
+from .utils.utils import isid
 
 
-def otherstuff():
-    partd = part_d_files(summary=True, usecols=['npi', 'total_claim_count'])
+def medicare_program_engagement():
+    partd = part_d_files(summary=True,
+                         usecols=['npi', 'total_claim_count'])
+    partd_engage = (partd.assign(PartD_Max_Year=lambda df: df.Year,
+                                 PartD_Min_Year=lambda df: df.Year)
+                         .groupby('npi', as_index=False)
+                         .agg({'PartD_Min_Year': min, 'PartD_Max_Year': max})
+                    )
     partb = part_b_files(summary=True,
                          columns=['National Provider Identifier',
                                   'Number of Medicare Beneficiaries'])
-    claims = (partb.rename(columns={'National Provider Identifier': 'npi'})
-                   .merge(partd, how='outer')
-                   .sort_values(['npi', 'Year'])
-                   .reset_index(drop=True))
+    partb_engage = (partb.assign(PartB_Max_Year=lambda df: df.Year,
+                                 PartB_Min_Year=lambda df: df.Year)
+                         .groupby('National Provider Identifier',
+                                  as_index=False)
+                         .agg({'PartB_Min_Year': min, 'PartB_Max_Year': max})
+                         .rename(columns={'National Provider Identifier':
+                                          'npi'}))
+    pc = physician_compare_select_vars([],
+                                       drop_duplicates=False,
+                                       date_var=True)
+    pc_engage = (pc.assign(Year=pc.date.dt.year)
+                   .drop(columns='date')
+                   .drop_duplicates())
+    pc_engage = (pc_engage.assign(PC_Max_Year=lambda df: df.Year,
+                                  PC_Min_Year=lambda df: df.Year)
+                          .groupby('NPI', as_index=False)
+                          .agg({'PC_Min_Year': min, 'PC_Max_Year': max})
+                          .rename(columns={'NPI': 'npi'}))
+    return (pc_engage
+            .merge(partd_engage, how='outer')
+            .merge(partb_engage, how='outer')
+            .convert_dtypes({x: 'Int64' for x in pc_engage.columns}))
 
 
-    # ADD PHYSICIAN COMPARE
-    cols = ['Medical school name', 'Graduation year',
-            'Group Practice PAC ID', 'Number of Group Practice members']
-    pc = process_vars(cols, drop_duplicates=False, date_var=True)
-    grad_years = (pc.groupby(['NPI', 'Graduation year'])
-                    .size()
-                    .reset_index()
-                    .sort_values(['NPI', 0])
-                    .groupby('NPI')
-                    .last()
-                    .drop(columns=0)
-                    .reset_index())
-    pc = (pc[['NPI', 'date']].assign(Year=pc.date.dt.year)
-                             .drop(columns='date')
-                             .drop_duplicates()
-                             .assign(physician_compare=1))
-    medicare = (claims.merge(pc.rename(columns={'NPI': 'npi'}), how='outer')
-                      .sort_values(['npi', 'Year'])
-                      .merge(grad_years.rename(columns={'NPI': 'npi'}),
-                             how='left', on='npi'))
-    medicare['Graduation year'] = medicare['Graduation year'].astype('Int64')
-    medicare = (medicare.merge(medicare[['npi', 'Year']].groupby('npi').max()
-                                                        .reset_index()
-                                                        .rename(
-                                                            columns={'Year':
-                                                                     'MaxYear'}
-                                                                     )))
-
-    "drop if old grad year, or if they drop out after high historical claims (if only a few claims, maybe cant determine)"
-    "people can move to private practice..."
+def medical_school(include_web_scraped=True):
+    cols = ['Medical school name', 'Graduation year']
+    med_school = physician_compare_select_vars(cols)
+    nodups = med_school[~med_school['NPI'].duplicated(keep=False)]
+    isid(nodups, ['NPI'], noisily=True)
+    dups = med_school[med_school['NPI'].duplicated(keep=False)]
+    others = dups.dropna()[dups.dropna()['Medical school name'] == "OTHER"]
+    others = others.drop_duplicates(subset='NPI', keep='first')
+    dups = dups.dropna()[dups.dropna()['Medical school name'] != "OTHER"]
+    dups = dups.drop_duplicates(subset='NPI', keep='first')
+    final = (nodups.append(dups)
+                   .append(others[~others.NPI.isin(nodups.append(dups).NPI)]))
+    final = (final.append(med_school[~med_school.NPI.isin(final.NPI)]
+                          .assign(
+                            oth=lambda x: x['Medical school name'] == "OTHER")
+                          .sort_values(['NPI', 'oth'])
+                          .drop_duplicates(subset='NPI', keep='first')
+                          .drop(columns='oth'))
+                  .rename(columns={'NPI': 'npi'}))
+    if include_web_scraped:
+        schools = pd.read_csv(med_school_path)
+        schools = (schools[~schools.npi.isin(final.npi)]
+                   .assign(notnull=lambda x: (x.medical_school_upper.notnull()
+                                              & x.grad_year.notnull()))
+                   .query('notnull==True')
+                   .drop(columns='notnull')
+                   .convert_dtypes({'npi': int,
+                                    'medical_school_upper': 'string',
+                                    'grad_year': 'Int64'}))
+        isid(schools, 'npi')
+        final = final.append(schools.rename(
+            columns={'medical_school_upper': 'Medical school name',
+                     'grad_year': 'Graduation year'})).reset_index(drop=True)
+        final['npi'] = final.npi.astype(int)
+    return final

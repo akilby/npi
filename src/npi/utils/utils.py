@@ -164,3 +164,12 @@ def isid(df, index_cols, noisily=False, assertion=True):
             raise AssertionError(print_string % ' do not')
         else:
             print(print_string % ' do not')
+
+
+def col_reorderer(df_cols, cols, how='first'):
+    assert how in ['first', 'last']
+    othercols = [x for x in df_cols if x not in cols]
+    if how == 'first':
+        return cols + othercols
+    else:
+        return othercols + cols
