@@ -1,8 +1,38 @@
 """
-https://www.cms.gov/Research-Statistics-Data-and-Systems/Statistics-Trends-and-Reports/Medicare-Provider-Charge-Data/Downloads/Medicare-Physician-and-Other-Supplier-PUF-Methodology.pdf
+https://www.cms.gov/Research-Statistics-Data-and-Systems/
+Statistics-Trends-and-Reports/Medicare-Provider-Charge-Data/
+Downloads/Prescriber_Methods.pdf
 
-The Physician and Other Supplier PUF includes data for providers that had a valid NPI and submitted Medicare Part B non-institutional claims (excluding DMEPOS) during the 2012 through 2017 calendar years. To protect the privacy of Medicare beneficiaries, any aggregated records which are derived from 10 or fewer beneficiaries are excluded from the Physician and Other Supplier PUF.
-Two summary type tables have been created to supplement the information reported in the Physician and Other Supplier PUF: 1) aggregated information by physician or other supplier (NPI)
+The Part D Prescriber PUF is based on beneficiaries enrolled in the Medicare
+Part D prescription drug program who comprise approximately 70 percent of
+all Medicare beneficiaries. Approximately two- thirds of Part D beneficiaries
+are enrolled in stand-alone Prescription Drug Plans (PDP) with the remaining
+one third enrolled in Medicare Advantage Prescription Drug (MAPD) plans.
+
+The Part D Prescriber PUF is restricted to prescribers who had a valid NPI
+and who were included on Medicare Part D PDEs submitted by the Part D plan
+sponsors during the calendar year. The dataset contains information
+predominantly from individual providers, but also includes a small
+proportion of organizational providers, such as nursing homes,
+group practices, non-physician practitioners, residential treatment
+facilities, ambulatory surgery centers, and other providers.
+
+Providers with fewer than 11 claims are not included in the data file.
+
+https://www.cms.gov/Research-Statistics-Data-and-Systems/
+Statistics-Trends-and-Reports/Medicare-Provider-Charge-Data/
+Downloads/Medicare-Physician-and-Other-Supplier-PUF-Methodology.pdf
+
+The Physician and Other Supplier PUF includes data for providers
+that had a valid NPI and submitted Medicare Part B non-institutional
+claims (excluding DMEPOS) during the 2012 through 2017 calendar years.
+To protect the privacy of Medicare beneficiaries, any aggregated records
+which are derived from 10 or fewer beneficiaries are excluded from the
+Physician and Other Supplier PUF.
+
+Two summary type tables have been created to supplement the information
+reported in the Physician and Other Supplier PUF: 1) aggregated
+information by physician or other supplier (NPI)
 """
 
 

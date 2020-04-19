@@ -202,7 +202,7 @@ def sanitize_web_medical_schools(med_school_path=final_data_path,
     assert schools.npi.is_unique
 
     # Real MDs:
-    from .utils.globalcache import c
+    from npi.utils.globalcache import c
     npi = NPI()
     taxcode = c.get_taxcode(npi.src, None, npi.entity, [1])
     mds = (taxcode.query('cat == "MD/DO" or cat == "MD/DO Student"')

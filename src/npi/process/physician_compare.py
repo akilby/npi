@@ -1,3 +1,18 @@
+"""
+No. Not every individual or group practice in PECOS is included on Physician
+Compare. In order to be included on the site, individual health care
+professionals must also:
+
+- Have at least one practice location address in PECOS
+- Have at least one specialty in PECOS
+- Have submitted a Medicare claim within the last 12 months or be newly
+enrolled in PECOS within the last 6 months
+
+For group practices to appear on Physician Compare, at least two active
+Medicare eligible professionals (EPs) must reassign their benefits to the
+group’s TIN.
+"""
+
 import calendar
 import glob
 import os
@@ -6,7 +21,8 @@ import re
 import pandas as pd
 
 from ..constants import RAW_PC_DIR
-from ..utils.utils import convert_dtypes, force_integer, singleton
+from ..utils.utils import (convert_dtypes, force_integer, force_integer_blanks,
+                           singleton)
 from . import DTYPES, PC_COL_DICT, PC_COL_DICT_REVERSE, PC_COLNAMES
 
 # lf = ['Medical school name', 'Graduation year']
@@ -96,16 +112,22 @@ class ReadPhysicianCompare(object):
         df = pd.read_csv(
             filename,
             index_col=False,
-            usecols=lambda x: str(x).strip() in expand_list_of_vars(variables))
+            usecols=(lambda x: str(x).strip().lower()
+                     in [x.lower() for x in expand_list_of_vars(variables)]))
         return df
 
 
 def process_vars(variables, drop_duplicates=True, date_var=False):
     """
     Pulls in physician compare data by variables, appends
+    if a variable hasn't been added to DTYPES, then it will not run
+    and adding it may cause problems as that var hasn't been debugged
     """
+    # NPI will be auto-added to the variable list later
+    variables = [x for x in variables if x != 'NPI']
     df_final = pd.DataFrame()
     for filename in glob.glob(os.path.join(RAW_PC_DIR, '*/*.csv')):
+        print('RUNNING:', filename)
         date = detect_date(filename)
         name = str(date).split(' ')[0].replace('-', '_')
         try:
@@ -118,9 +140,9 @@ def process_vars(variables, drop_duplicates=True, date_var=False):
             print('FILENAME:', filename)
             raise ValueError
         df.columns = [x.strip() for x in df.columns]
-        if date_var:
-            df['date'] = date
-        df = df.rename(columns=PC_COL_DICT)[['NPI'] + variables]
+        full_col_ren = {**PC_COL_DICT, **{key.lower(): val
+                                          for key, val in PC_COL_DICT.items()}}
+        df = df.rename(columns=full_col_ren)[['NPI'] + variables]
         try:
             df = convert_dtypes(df, DTYPES)
         except ValueError:
@@ -128,7 +150,23 @@ def process_vars(variables, drop_duplicates=True, date_var=False):
             raise ValueError
         except TypeError:
             print(filename)
-            raise TypeError
+            try:
+                var = 'Group Practice PAC ID'
+                if var in variables:
+                    df[var] = df[var].apply(
+                        lambda x: force_integer_blanks(x, ' '))
+                    df = convert_dtypes(df, DTYPES)
+            except TypeError:
+                try:
+                    var = 'Number of Group Practice members'
+                    if var in variables:
+                        df[var] = df[var].apply(
+                            lambda x: force_integer_blanks(x, '.'))
+                        df = convert_dtypes(df, DTYPES)
+                except TypeError:
+                    raise TypeError
+        if date_var:
+            df['date'] = date
         df_final = df_final.append(df)
         if drop_duplicates:
             df_final = df_final.drop_duplicates()

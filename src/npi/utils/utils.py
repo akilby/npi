@@ -141,3 +141,13 @@ def force_integer(x):
         return int(x)
     except ValueError:
         return None
+
+
+def force_integer_blanks(x, forcematch):
+    try:
+        return int(x)
+    except ValueError:
+        if x == forcematch:
+            return None
+        else:
+            raise ValueError
