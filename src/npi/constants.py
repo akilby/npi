@@ -15,6 +15,29 @@ DISSEM_PATHS = ['http://download.cms.gov/nppes/',
 USE_MONTH_LIST = ['Jan', 'Feb', 'March', 'April', 'May', 'June',
                   'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec']
 
+API_SOURCE_PATH = ('https://data.cms.gov/'
+                   'api/views/'
+                   '%s/rows.csv?accessType=DOWNLOAD')
+
+PART_D_SOURCE_PATH = ('http://download.cms.gov/'
+                      'Research-Statistics-Data-and-Systems/'
+                      'Statistics-Trends-and-Reports/'
+                      'Medicare-Provider-Charge-Data/'
+                      'Downloads/')
+
+PART_B_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_b'
+
+PART_D_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_d'
+
+PART_D_OPI_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_d_opioids'
+
+PART_B_STUB_SUM = ('Medicare_Physician_and_Other_Supplier_National_Provider'
+                   '_Identifier__NPI__Aggregate_Report__Calendar_Year_')
+
+PART_B_STUB = ('Medicare_Provider_Utilization_and_Payment_Data__Physician'
+               '_and_Other_Supplier_')
+
+PART_D_OPI_STUB = 'Medicare_Part_D_Opioid_Prescriber_Summary_File_'
 
 USE_VAR_LIST_DICT = {
     'npi': 'NPI',

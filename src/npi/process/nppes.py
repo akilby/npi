@@ -279,6 +279,21 @@ def process_variable(folder, variable, searchlist, final_weekly_updates=True):
     return df
 
 
+def sanitize_csv_for_update(df, variable):
+    df['month'] = pd.to_datetime(df.month)
+    if DTYPES[variable] == 'datetime64[ns]':
+        df[variable] = pd.to_datetime(df[variable])
+    elif variable == 'ploctel':
+        # Still not sure the ploctel update is working
+        df[variable] = df[variable].astype(str)
+        df.loc[df.ploctel.str.endswith('.0'),
+               'ploctel'] = df.ploctel.str[:-2]
+        df[variable] = df[variable].astype(DTYPES[variable])
+    else:
+        df[variable] = df[variable].astype(DTYPES[variable])
+    return df
+
+
 def main_process_variable(variable, update):
     # Should figure out NPPES_Data_Dissemination_March_2011 because it's weird;
     # deleting for now
@@ -291,11 +306,7 @@ def main_process_variable(variable, update):
     else:
         print(f'Updating: {variable}')
         df = pd.read_csv(os.path.join(DATA_DIR, '%s.csv' % variable))
-        df['month'] = pd.to_datetime(df.month)
-        if DTYPES[variable] == 'datetime64[ns]':
-            df[variable] = pd.to_datetime(df[variable])
-        else:
-            df[variable] = df[variable].astype(DTYPES[variable])
+        df = sanitize_csv_for_update(df, variable)
         last_month = max(list(df.month.value_counts().index))
         searchlist = [x for x in nppes_month_list() if
                       (pd.to_datetime('%s-%s-01' % (x[0], x[1]))
@@ -357,8 +368,7 @@ def update_all(max_jobs=6):
     from jobs.run import RunScript
     list_of_jobs = []
     # varl = USE_VAR_LIST.copy()
-    varl = ['ploc2cityname', 'ploc2line1', 'ploc2line2', 'ploc2statename',
-            'ploc2tel', 'ploc2zip', 'ploctel']
+    varl = ['ploctel']
     while len(varl) > 0:
         while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
                < max_jobs):
