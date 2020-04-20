@@ -416,3 +416,30 @@ def npi_names_sahmsa_matches_statebatch(stateabbrev):
 # 
 # possibles = merged[['NameFull', 'State', 'DateLastCertified', 'npi', 'pfname', 'plname', 'diff2']].groupby(['NameFull', 'State', 'DateLastCertified', 'npi', 'pfname', 'plname']).min()
 # possibles = possibles.merge(possibles.groupby(level=[0, 1, 2]).count(), left_index=True, right_index=True)
+
+
+### WORKING WITH PECOS ###
+
+src = '/work/akilby/npi/samhsa_processing/FOIA_12312019_datefilled_clean_NPITelefill.csv'
+samhsa = pd.read_csv(src, low_memory=False)
+idvars = ['NameFull', 'DateLastCertified', 'PractitionerType']
+for idvar in idvars:
+    samhsa[idvar] = samhsa[idvar].str.upper()
+ids = (samhsa[idvars].drop_duplicates()
+                     .reset_index(drop=True)
+                     .reset_index()
+                     .rename(columns=dict(index='samhsa_id')))
+samhsa_orig = samhsa.merge(ids)
+
+samhsa_match = pd.read_csv('/work/akilby/npi/samhsa_processing/samhsa_npi_usable_data_with_locs.csv')
+
+
+samhsa_orig.samhsa_id.drop_duplicates()
+samhsa_match.samhsa_id.drop_duplicates()
+
+cols = ['Primary specialty','Secondary specialty 1', 'Secondary specialty 2','Secondary specialty 3', 'Secondary specialty 4']
+groups = physician_compare_select_vars(['Group Practice PAC ID', 'Number of Group Practice members']+cols, drop_duplicates=False,date_var=True)
+samhsa_match = samhsa_match[['WaiverType', 'PractitionerType', 'samhsa_id', 'npi', 'location_no', 'ploctel', 'zip', 'plocstatename', 'Date']].drop_duplicates() 
+
+npi=NPI(entities=1)     
+npi.retrieve('ptaxcode')

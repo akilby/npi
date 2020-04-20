@@ -19,6 +19,11 @@ from .utils.utils import isid
 
 
 def medicare_program_engagement():
+    """
+    Produces a wide dataset at the NPI level that shows when a provider entered
+    and exited the three different medicare databases: Part B, Part D, and
+    Physician Compare
+    """
     partd = part_d_files(summary=True,
                          usecols=['npi', 'total_claim_count'])
     partd_engage = (partd.assign(PartD_Max_Year=lambda df: df.Year,
@@ -54,6 +59,13 @@ def medicare_program_engagement():
 
 
 def medical_school(include_web_scraped=True):
+    """
+    Returns medical schools and graduation dates at the NPI level
+    Has been unique-ified by dropping "other" entries, and then
+    randomly choosing between duplicates if one isn't other
+    Also has the option of bringing in approx. 127 entries from the
+    web-scraped database.
+    """
     cols = ['Medical school name', 'Graduation year']
     med_school = physician_compare_select_vars(cols)
     nodups = med_school[~med_school['NPI'].duplicated(keep=False)]
