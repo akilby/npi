@@ -3,13 +3,14 @@ import re
 
 import pandas as pd
 
-from .npi import expand_names_in_sensible_ways
+from ..npi import expand_names_in_sensible_ways
 
-source_file = '/work/akilby/npi/FOIA_12312019_datefilled_clean_NPITelefill.csv'
+source_file = ('/work/akilby/npi/samhsa_processing/'
+               'FOIA_12312019_datefilled_clean_NPITelefill.csv')
 
 
 class SAMHSA(object):
-    def __init__(self, src):
+    def __init__(self, src=source_file):
         self.source_file = src
         self.samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
 
