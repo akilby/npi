@@ -298,43 +298,40 @@ class NPI(object):
         self.get_credentials()
         self.get_ptaxcode()
 
-        # training_future = (pd.concat([taxcode_e1,
-        #                       pd.get_dummies(taxcode_e1.cat,
-        #                                      dummy_na=True)
-        #                       ],
-        #                      axis=1)
-        #              .drop(columns=['cat', 'ptaxcode', 'entity'])
-        #              .groupby('npi').max())
-        # training_future.columns = ['MDDO', 'MDDOStudent', 'NP',
-        #                            'OtherAPRN', 'PA', 'NaN']
-        # not_docs = (training_future.query(
-        #     'MDDOStudent==1 and (NaN+PA+NP+OtherAPRN)>0 and MDDO==0')
-        #                            .reset_index())
-        # not_doc_list = ['DDS', 'DMD', 'DPM', 'PHARMD', 'PSYD']
-        # not_docs2 = (training_future.reset_index()
-        #                             .merge(credentials)
-        #                             .query('MDDOStudent==1 & MDDO==0')
-        #                             .merge(pd.DataFrame(
-        #                                 {'pcredential_stripped': not_doc_list})
-        #                             ))
-        # not_docs = not_docs.append(not_docs2[not_docs.columns])
-        # not_docs['cat'] = "MD/DO Student"
-        # taxcode_e1 = (taxcode_e1.merge(not_docs[['npi', 'cat']],
-        #                                how='left', indicator=True)
-        #                         .query('_merge=="left_only"')
-        #                         .drop(columns='_merge'))
-        #     # taxcode_all = (taxcode_all.merge(not_docs[['npi', 'cat']],
-        #     #                                  how='left', indicator=True)
-        #     #                           .query('_merge=="left_only"')
-        #     #                           .drop(columns='_merge'))
+        credentials_orig = self.credentials
+        taxcode_orig = self.ptaxcode.query('entity==1')
 
+        # gets rid of student codes if we can identify what
+        # a person later becomes using credentials or taxcodes.
+        # If not, they are marked as student
+        credentials = pd.concat(
+            [credentials_orig.npi, pd.get_dummies(credentials_orig.cat,
+                                                  dummy_na=True)],
+            axis=1).groupby('npi').max()
+        credentials.columns = credentials.columns.fillna('No Category')
+        taxcode = pd.concat(
+            [taxcode_orig.npi, pd.get_dummies(taxcode_orig.cat,
+                                              dummy_na=True)],
+            axis=1).groupby('npi').max()
+        taxcode.columns = taxcode.columns.fillna('No Category')
 
-    # def get_training_dates(self):
-    #     if hasattr(self, 'training_dates'):
-    #         return
-    #     from .utils.globalcache import c
-    #     training_details = c.get_training_dates(self.src, self.entity)
-    #     self.training_dates = training_details
+        prac_type = (credentials.reset_index()
+                                .merge(taxcode.reset_index(), how='outer')
+                                .fillna(0)
+                                .groupby('npi').max())
+
+        prac_type = prac_type.assign(su=(prac_type[[x for x
+                                                    in prac_type.columns
+                                                    if x != "No Category"
+                                                    and x != "Student"]]
+                                         ).sum(1))
+        prac_type.loc[prac_type.su >= 1, 'Student'] = 0
+        prac_type.loc[prac_type.su >= 1, 'No Category'] = 0
+        prac_type = prac_type.drop(columns='su')
+        for col in prac_type.columns:
+            prac_type[col] = prac_type[col].astype(int)
+
+        self.practitioner_type = prac_type.reset_index()
 
 
 def purge_nulls(df, var, mergeon):
@@ -519,13 +516,28 @@ def categorize_taxcodes(df):
     cns = (tax.query('Classification == "Clinical Nurse Specialist"')
               .TaxonomyCode
               .tolist())
+    c = tax.query('Classification=="Chiropractor"').TaxonomyCode.tolist()
+    d = tax.query('Classification=="Dentist"').TaxonomyCode.tolist()
+    po = tax.query('Classification=="Podiatrist"').TaxonomyCode.tolist()
+    ph = tax.query('Classification=="Pharmacist"').TaxonomyCode.tolist()
+    o = tax.query('Classification=="Optometrist"').TaxonomyCode.tolist()
+    p = tax.query('Classification=="Psychologist"').TaxonomyCode.tolist()
     student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
+
     df.loc[(df.ptaxcode.isin(pa) & df.entity == 1), 'cat'] = 'PA'
     df.loc[(df.ptaxcode.isin(np) & df.entity == 1), 'cat'] = 'NP'
     df.loc[(df.ptaxcode.isin(mddo) & df.entity == 1), 'cat'] = 'MD/DO'
     df.loc[(df.ptaxcode.isin(crna) & df.entity == 1), 'cat'] = 'CRNA'
     df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
     df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
+
+    df.loc[(df.ptaxcode.isin(c) & df.entity == 1), 'cat'] = 'Chiropractor'
+    df.loc[(df.ptaxcode.isin(d) & df.entity == 1), 'cat'] = 'Dentist'
+    df.loc[(df.ptaxcode.isin(po) & df.entity == 1), 'cat'] = 'Podiatrist'
+    df.loc[(df.ptaxcode.isin(ph) & df.entity == 1), 'cat'] = 'Pharmacist'
+    df.loc[(df.ptaxcode.isin(o) & df.entity == 1), 'cat'] = 'Optometrist'
+    df.loc[(df.ptaxcode.isin(p) & df.entity == 1), 'cat'] = 'Psychologist'
+
     df.loc[(df.ptaxcode.isin(student) & df.entity == 1), 'cat'] = 'Student'
     return df
 
@@ -537,10 +549,6 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
     Returns non-temporal data unless otherwise specified;
     all taxcodes associated with a given NPI
     Assigns a category only to entity types 1
-    NO LONGER Removes erroneous entries with the MD student code that
-    later do not become doctors; this procedure is not possible for
-    young trainees. Uses both future taxonomy codes and also the
-    credentials dataset
     """
     taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
     if temporal:
@@ -820,12 +828,19 @@ def credentials_map(return_type='DataFrame'):
     """
     assert return_type in ['dict', 'DataFrame']
     d = {'MD/DO': ['MD', 'DO'],
-         'PA': ['PA-C', 'PA'],
-         'NP': ['NP', 'FNP', 'ARNP', 'FNP-C', 'CRNP', 'FNP-BC', 'CNP', 'NP-C'],
+         'PA': ['PA-C', 'PA', 'PAC', 'PHYSICIANASSISTANT', 'RPA-C', 'MPAS'],
+         'NP': ['NP', 'FNP', 'ARNP', 'FNP-C', 'CRNP', 'FNP-BC', 'CNP',
+                'NP-C', 'DNP', 'CPNP'],
          'Other APRN': ['APN', 'APRN'],
          'CRNA': ['CRNA'],
          'CNM': ['CNM'],
-         'CNS': ['CNS']
+         'CNS': ['CNS'],
+         'Chiropractor': ['DC'],
+         'Dentist': ['DDS', 'DMD'],
+         'Podiatrist': ['DPM'],
+         'Pharmacist': ['PHARMD', 'RPH', 'PHARMACIST', 'DPH', 'BCPS'],
+         'Optometrist': ['OD'],
+         'Psychologist': ['PSYD', 'PSYCHOLOGIST']
          }
     if return_type == 'dict':
         return d
@@ -839,10 +854,29 @@ def credentials_map(return_type='DataFrame'):
                                                                 'cat']])
 
 
-
-
-
-
+def credential_taxonomy_classification_pairs(credentials,
+                                             taxonomies,
+                                             search_credential=None,
+                                             search_taxonomy=None):
+    tax = provider_taxonomies()
+    if search_taxonomy:
+        s = pd.DataFrame({'Classification': [search_taxonomy]})
+        return (taxonomies.merge(tax.merge(s),
+                                 left_on='ptaxcode',
+                                 right_on='TaxonomyCode')[['npi']]
+                          .drop_duplicates()
+                          .merge(credentials)
+                          .pcredential_stripped.value_counts())
+    elif search_credential:
+        s = pd.DataFrame({'pcredential_stripped': [search_credential]})
+        return (credentials.merge(s)[['npi']]
+                           .drop_duplicates()
+                           .merge(taxonomies)[['ptaxcode']]
+                           .merge(tax, left_on='ptaxcode',
+                                  right_on='TaxonomyCode')
+                           .Classification.value_counts())
+    else:
+        raise Exception('cannot do both search_credential and search_taxonomy')
 
 #def get_training_dates(src, entity):
 #     '''
