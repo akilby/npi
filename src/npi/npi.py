@@ -472,18 +472,23 @@ def categorize_taxcodes(df):
     mddo = (tax.query('Type=="Allopathic & Osteopathic Physicians"')
                .TaxonomyCode
                .tolist())
-    o_aprn = (tax.query(
-        'Type == "Physician Assistants & Advanced Practice Nursing Providers" '
-        'and Classification!="Nurse Practitioner" '
-        'and Classification!="Physician Assistant" '
-        'and Classification!="Anesthesiologist Assistant"')
-                 .TaxonomyCode
-                 .tolist())
+    crna = (tax.query('Classification == "Nurse Anesthetist, '
+                      'Certified Registered"')
+               .TaxonomyCode
+               .tolist())
+    cnm = (tax.query('Classification == "Advanced Practice Midwife"')
+              .TaxonomyCode
+              .tolist())
+    cns = (tax.query('Classification == "Clinical Nurse Specialist"')
+              .TaxonomyCode
+              .tolist())
     student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
     df.loc[(df.ptaxcode.isin(pa) & df.entity == 1), 'cat'] = 'PA'
     df.loc[(df.ptaxcode.isin(np) & df.entity == 1), 'cat'] = 'NP'
     df.loc[(df.ptaxcode.isin(mddo) & df.entity == 1), 'cat'] = 'MD/DO'
-    df.loc[(df.ptaxcode.isin(o_aprn) & df.entity == 1), 'cat'] = 'Other APRN'
+    df.loc[(df.ptaxcode.isin(crna) & df.entity == 1), 'cat'] = 'CRNA'
+    df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
+    df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
     df.loc[(df.ptaxcode.isin(student)
             & df.entity == 1), 'cat'] = 'MD/DO Student'
     return df
@@ -803,11 +808,19 @@ def get_address(src, npis, entity, removaldate, entities, name_stub):
 
 
 def credentials_map(return_type='DataFrame'):
+    """
+    This is obviously not complete. Currently focused on the credentials that
+    show up in the SAMHSA data.
+    """
     assert return_type in ['dict', 'DataFrame']
     d = {'MD/DO': ['MD', 'DO'],
          'PA': ['PA-C', 'PA'],
          'NP': ['NP', 'FNP', 'ARNP', 'FNP-C', 'CRNP', 'FNP-BC', 'CNP', 'NP-C'],
-         'Other APRN': ['APN', 'APRN', 'CRNA', 'CNM', 'CNS']}
+         'Other APRN': ['APN', 'APRN'],
+         'CRNA': ['CRNA'],
+         'CNM': ['CNM'],
+         'CNS': ['CNS']
+         }
     if return_type == 'dict':
         return d
     else:
