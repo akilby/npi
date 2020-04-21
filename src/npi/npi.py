@@ -8,6 +8,7 @@ added to the NPI in recent years in different files
 
 import os
 import re
+from functools import reduce
 
 import pandas as pd
 # from download.medical_schools import sanitize_web_medical_schools
@@ -229,6 +230,10 @@ class NPI(object):
                                                           .str.replace(' ', '')
                                                           .str.strip()
                                                           .str.upper())
+        credentials = credentials.merge(credentials_map(),
+                                        left_on='pcredential_stripped',
+                                        right_on='credential',
+                                        how='left').drop(columns='credential')
         self.credentials = credentials
 
     def get_licenses(self):
@@ -260,9 +265,11 @@ class NPI(object):
     def get_ptaxcode(self):
         if hasattr(self, 'ptaxcode'):
             return
+        self.get_credentials()
+
         from .utils.globalcache import c
         taxcode = c.get_taxcode(
-            self.src, self.npis, self.entity, self.entities)
+            self.src, self.npis, self.entity, self.entities, self.credentials)
         self.ptaxcode = taxcode
 
     def get_expanded_fullnames(self):
@@ -276,12 +283,21 @@ class NPI(object):
         self.expanded_fullnames = expand_names_in_sensible_ways(
             f, idvar, firstname, middlename, lastname)
 
-    def get_training_dates(self):
-        if hasattr(self, 'training_dates'):
+    def get_secondary_practice_locations(self):
+        if hasattr(self, 'secondary_practice_locations'):
             return
-        from .utils.globalcache import c
-        training_details = c.get_training_dates(self.src, self.entity)
-        self.training_dates = training_details
+        dfs = [pd.read_csv(os.path.join(self.src, f'ploc2{item}.csv'))
+               for item in
+               ['line1', 'line2', 'cityname', 'statename', 'tel', 'zip']]
+        dfm = reduce(lambda left, right: pd.merge(left, right), dfs)
+        self.secondary_practice_locations = dfm
+
+    # def get_training_dates(self):
+    #     if hasattr(self, 'training_dates'):
+    #         return
+    #     from .utils.globalcache import c
+    #     training_details = c.get_training_dates(self.src, self.entity)
+    #     self.training_dates = training_details
 
 
 def purge_nulls(df, var, mergeon):
@@ -456,16 +472,24 @@ def categorize_taxcodes(df):
     mddo = (tax.query('Type=="Allopathic & Osteopathic Physicians"')
                .TaxonomyCode
                .tolist())
+    o_aprn = (tax.query(
+        'Type == "Physician Assistants & Advanced Practice Nursing Providers" '
+        'and Classification!="Nurse Practitioner" '
+        'and Classification!="Physician Assistant" '
+        'and Classification!="Anesthesiologist Assistant"')
+                 .TaxonomyCode
+                 .tolist())
     student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
     df.loc[(df.ptaxcode.isin(pa) & df.entity == 1), 'cat'] = 'PA'
     df.loc[(df.ptaxcode.isin(np) & df.entity == 1), 'cat'] = 'NP'
     df.loc[(df.ptaxcode.isin(mddo) & df.entity == 1), 'cat'] = 'MD/DO'
+    df.loc[(df.ptaxcode.isin(o_aprn) & df.entity == 1), 'cat'] = 'Other APRN'
     df.loc[(df.ptaxcode.isin(student)
             & df.entity == 1), 'cat'] = 'MD/DO Student'
     return df
 
 
-def get_taxcode(src, npis, entity, entities, temporal=False):
+def get_taxcode(src, npis, entity, entities, credentials, temporal=False):
     """
     Retrieves taxonomy codes (including all 15 entries if necessary)
     Entity type 1 or 2 can have a taxcode
@@ -474,7 +498,8 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
     Assigns a category only to entity types 1
     Removes erroneous entries with the MD student code that
     later do not become doctors; this procedure is not possible for
-    young trainees
+    young trainees. Uses both future taxonomy codes and also the
+    credentials dataset
     """
     taxcode = read_csv_npi(os.path.join(src, 'ptaxcode.csv'), npis)
     if temporal:
@@ -493,9 +518,19 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
                                      axis=1)
                              .drop(columns=['cat', 'ptaxcode', 'entity'])
                              .groupby('npi').max())
-        training_future.columns = ['MDDO', 'MDDOStudent', 'NP', 'PA', 'NaN']
-        not_docs = training_future.query(
-            'MDDOStudent==1 and (NaN+PA+NP)>0 and MDDO==0').reset_index()
+        training_future.columns = ['MDDO', 'MDDOStudent', 'NP',
+                                   'OtherAPRN', 'PA', 'NaN']
+        not_docs = (training_future.query(
+            'MDDOStudent==1 and (NaN+PA+NP+OtherAPRN)>0 and MDDO==0')
+                                   .reset_index())
+        not_doc_list = ['DDS', 'DMD', 'DPM', 'PHARMD', 'PSYD']
+        not_docs2 = (training_future.reset_index()
+                                    .merge(credentials)
+                                    .query('MDDOStudent==1 & MDDO==0')
+                                    .merge(pd.DataFrame(
+                                        {'pcredential_stripped': not_doc_list})
+                                    ))
+        not_docs = not_docs.append(not_docs2[not_docs.columns])
         not_docs['cat'] = "MD/DO Student"
         taxcode_e1 = (taxcode_e1.merge(not_docs[['npi', 'cat']],
                                        how='left', indicator=True)
@@ -767,7 +802,30 @@ def get_address(src, npis, entity, removaldate, entities, name_stub):
     return address
 
 
-# def get_training_dates(src, entity):
+def credentials_map(return_type='DataFrame'):
+    assert return_type in ['dict', 'DataFrame']
+    d = {'MD/DO': ['MD', 'DO'],
+         'PA': ['PA-C', 'PA'],
+         'NP': ['NP', 'FNP', 'ARNP', 'FNP-C', 'CRNP', 'FNP-BC', 'CNP', 'NP-C'],
+         'Other APRN': ['APN', 'APRN', 'CRNA', 'CNM', 'CNS']}
+    if return_type == 'dict':
+        return d
+    else:
+        return (pd.DataFrame.from_dict(d, orient='index')
+                            .stack()
+                            .reset_index()
+                            .drop(columns='level_1')
+                            .rename(columns={'level_0': 'cat',
+                                             0: 'credential'})[['credential',
+                                                                'cat']])
+
+
+
+
+
+
+
+#def get_training_dates(src, entity):
 #     '''
 #     This is extremely rough and should get replaced
 #     MD training details for all MDs and MD Students
