@@ -265,11 +265,10 @@ class NPI(object):
     def get_ptaxcode(self):
         if hasattr(self, 'ptaxcode'):
             return
-        self.get_credentials()
 
         from .utils.globalcache import c
         taxcode = c.get_taxcode(
-            self.src, self.npis, self.entity, self.entities, self.credentials)
+            self.src, self.npis, self.entity, self.entities)
         self.ptaxcode = taxcode
 
     def get_expanded_fullnames(self):
@@ -532,7 +531,7 @@ def categorize_taxcodes(df):
     return df
 
 
-def get_taxcode(src, npis, entity, entities, credentials, temporal=False):
+def get_taxcode(src, npis, entity, entities, temporal=False):
     """
     Retrieves taxonomy codes (including all 15 entries if necessary)
     Entity type 1 or 2 can have a taxcode
