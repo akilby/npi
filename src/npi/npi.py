@@ -292,6 +292,44 @@ class NPI(object):
         dfm = reduce(lambda left, right: pd.merge(left, right), dfs)
         self.secondary_practice_locations = dfm
 
+    def get_practitioner_type(self):
+        if hasattr(self, 'practitioner_type') or self.entities in [2, [2]]:
+            return
+
+        self.get_credentials()
+        self.get_ptaxcode()
+
+        # training_future = (pd.concat([taxcode_e1,
+        #                       pd.get_dummies(taxcode_e1.cat,
+        #                                      dummy_na=True)
+        #                       ],
+        #                      axis=1)
+        #              .drop(columns=['cat', 'ptaxcode', 'entity'])
+        #              .groupby('npi').max())
+        # training_future.columns = ['MDDO', 'MDDOStudent', 'NP',
+        #                            'OtherAPRN', 'PA', 'NaN']
+        # not_docs = (training_future.query(
+        #     'MDDOStudent==1 and (NaN+PA+NP+OtherAPRN)>0 and MDDO==0')
+        #                            .reset_index())
+        # not_doc_list = ['DDS', 'DMD', 'DPM', 'PHARMD', 'PSYD']
+        # not_docs2 = (training_future.reset_index()
+        #                             .merge(credentials)
+        #                             .query('MDDOStudent==1 & MDDO==0')
+        #                             .merge(pd.DataFrame(
+        #                                 {'pcredential_stripped': not_doc_list})
+        #                             ))
+        # not_docs = not_docs.append(not_docs2[not_docs.columns])
+        # not_docs['cat'] = "MD/DO Student"
+        # taxcode_e1 = (taxcode_e1.merge(not_docs[['npi', 'cat']],
+        #                                how='left', indicator=True)
+        #                         .query('_merge=="left_only"')
+        #                         .drop(columns='_merge'))
+        #     # taxcode_all = (taxcode_all.merge(not_docs[['npi', 'cat']],
+        #     #                                  how='left', indicator=True)
+        #     #                           .query('_merge=="left_only"')
+        #     #                           .drop(columns='_merge'))
+
+
     # def get_training_dates(self):
     #     if hasattr(self, 'training_dates'):
     #         return
@@ -490,7 +528,7 @@ def categorize_taxcodes(df):
     df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
     df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
     df.loc[(df.ptaxcode.isin(student)
-            & df.entity == 1), 'cat'] = 'MD/DO Student'
+            & df.entity == 1), 'cat'] = 'Student'
     return df
 
 
@@ -501,7 +539,7 @@ def get_taxcode(src, npis, entity, entities, credentials, temporal=False):
     Returns non-temporal data unless otherwise specified;
     all taxcodes associated with a given NPI
     Assigns a category only to entity types 1
-    Removes erroneous entries with the MD student code that
+    NO LONGER Removes erroneous entries with the MD student code that
     later do not become doctors; this procedure is not possible for
     young trainees. Uses both future taxonomy codes and also the
     credentials dataset
@@ -516,34 +554,8 @@ def get_taxcode(src, npis, entity, entities, credentials, temporal=False):
     if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
         taxcode_e1 = (taxcode.merge(entity.query('entity==1')))
         taxcode_e1 = categorize_taxcodes(taxcode_e1)
-        training_future = (pd.concat([taxcode_e1,
-                                      pd.get_dummies(taxcode_e1.cat,
-                                                     dummy_na=True)
-                                      ],
-                                     axis=1)
-                             .drop(columns=['cat', 'ptaxcode', 'entity'])
-                             .groupby('npi').max())
-        training_future.columns = ['MDDO', 'MDDOStudent', 'NP',
-                                   'OtherAPRN', 'PA', 'NaN']
-        not_docs = (training_future.query(
-            'MDDOStudent==1 and (NaN+PA+NP+OtherAPRN)>0 and MDDO==0')
-                                   .reset_index())
-        not_doc_list = ['DDS', 'DMD', 'DPM', 'PHARMD', 'PSYD']
-        not_docs2 = (training_future.reset_index()
-                                    .merge(credentials)
-                                    .query('MDDOStudent==1 & MDDO==0')
-                                    .merge(pd.DataFrame(
-                                        {'pcredential_stripped': not_doc_list})
-                                    ))
-        not_docs = not_docs.append(not_docs2[not_docs.columns])
-        not_docs['cat'] = "MD/DO Student"
-        taxcode_e1 = (taxcode_e1.merge(not_docs[['npi', 'cat']],
-                                       how='left', indicator=True)
-                                .query('_merge=="left_only"')
-                                .drop(columns='_merge'))
     if entities in [2, [2]] or entities == [1, 2] or entities == [2, 1]:
         taxcode_e2 = (taxcode.merge(entity.query('entity==2')))
-
     if not temporal:
         if entities in [1, [1]]:
             return taxcode_e1
@@ -556,10 +568,6 @@ def get_taxcode(src, npis, entity, entities, credentials, temporal=False):
             if entities in [1, [1]]:
                 taxcode_all = taxcode_all.query('entity==1')
             taxcode_all = categorize_taxcodes(taxcode_all)
-            taxcode_all = (taxcode_all.merge(not_docs[['npi', 'cat']],
-                                             how='left', indicator=True)
-                                      .query('_merge=="left_only"')
-                                      .drop(columns='_merge'))
             return taxcode_all
         elif entities in [2, [2]]:
             return taxcode_all.query('entity==2')
