@@ -526,8 +526,7 @@ def categorize_taxcodes(df):
     df.loc[(df.ptaxcode.isin(crna) & df.entity == 1), 'cat'] = 'CRNA'
     df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
     df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
-    df.loc[(df.ptaxcode.isin(student)
-            & df.entity == 1), 'cat'] = 'Student'
+    df.loc[(df.ptaxcode.isin(student) & df.entity == 1), 'cat'] = 'Student'
     return df
 
 
