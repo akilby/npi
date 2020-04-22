@@ -1,6 +1,7 @@
 
 import re
 
+import numpy as np
 import pandas as pd
 
 from ..npi import expand_names_in_sensible_ways
@@ -39,6 +40,7 @@ class SAMHSA(object):
         badl = credential_suffixes()
         names = remove_suffixes(names, badl)
         names[namecol] = remove_mi_periods(names[namecol])
+        cols = [namecol, 'samhsa_id']
         while not remove_suffixes(names.copy(), badl).equals(names.copy()):
             names = remove_suffixes(names, badl)
 
@@ -83,6 +85,29 @@ class SAMHSA(object):
                             .drop_duplicates())
 
         names = newnames.merge(names[['samhsa_id', 'Credential String']])
+        ends = names[['samhsa_id', 'Credential String']]
+        ends = pd.concat(
+            [ends, ends['Credential String'].str.split('|', expand=True)],
+            axis=1)
+        ends = (ends.drop(columns='Credential String')
+                    .set_index('samhsa_id')
+                    .stack()
+                    .reset_index()
+                    .rename(columns={0: 'Credential'})
+                    .query('Credential !=""')
+                    .drop(columns='level_1')
+                    .drop_duplicates())
+        ends['Credential'] = (ends.Credential.str.replace('.', '')
+                                             .str.replace(' ', '')
+                                             .str.replace('M,D', 'MD'))
+        ends = pd.concat([ends, ends.Credential.str.split(',', expand=True)],
+                         axis=1)
+        ends = (ends.drop(columns=['Credential'])
+                    .set_index('samhsa_id')
+                    .stack()
+                    .reset_index()
+                    .drop(columns='level_1')
+                    .rename(columns={0: 'Suffix'}))
         names = names.drop(columns='Credential String')
         names = (names.sort_values(['samhsa_id', 'middlename'],
                                    ascending=False)
@@ -93,6 +118,7 @@ class SAMHSA(object):
         # ## ADD SUFFIX AND TREAT LIKE A MIDDLE NAME IN TERMS OF ORDER
         self.names = (names.sort_values(['samhsa_id', 'order'])
                            .reset_index(drop=True))
+        self.suffix = ends
 
 
 def credential_suffixes():
@@ -118,10 +144,14 @@ def credential_suffixes():
 
 def remove_suffixes(samhsa, badl):
     name_col = samhsa.columns.tolist()[0]
+    if 'Credential String' not in samhsa.columns:
+        samhsa['Credential String'] = np.nan
     for b in badl:
         samhsa.loc[samhsa[name_col].apply(lambda x: x.endswith(' ' + b)),
-                   'Credential String'] = (samhsa[name_col].apply(
-                    lambda x: x[len(x)-len(b):]))
+                   'Credential String'] = (
+                    samhsa['Credential String'].fillna('|') + '|' +
+                    + samhsa[name_col].apply(lambda x: x[len(x)-len(b):])
+                    )
         samhsa[name_col] = (samhsa[name_col].apply(
             lambda x: x[:len(x)-len(b)] if x.endswith(' ' + b) else x))
         samhsa[name_col] = samhsa[name_col].str.strip()

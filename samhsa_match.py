@@ -42,6 +42,7 @@ samhsa_names_credential_state_zip = (
             .drop_duplicates())
      )
 # ADD SUFFIXES!
+suffixes = ['JR', 'III', 'II', 'SR', 'IV']
 # First: match to NPI database
 npi_names_credential_state_zip = (
     npi.expanded_fullnames
@@ -105,11 +106,28 @@ names = (names.pipe(expand_names_in_sensible_ways,
               .drop(columns='name')
               .drop_duplicates())
 
-
 pc_names_credential_state_zip = (
-    names.merge(pc_names_state_zip.drop(columns=['lastname', 'firstname', 
+    names.merge(pc_names_state_zip.drop(columns=['lastname', 'firstname',
                                                  'middlename']))
          .merge(npi.practitioner_type.pipe(convert_practitioner_data_to_long)))
+
+for o in orders:
+    m = make_clean_matches(
+        samhsa_names_credential_state_zip.query(f'order=={o}'),
+        pc_names_credential_state_zip,
+        id_use='samhsa_id', id_target='npi',
+        blocklist=final_crosswalk)
+    final_crosswalk = final_crosswalk.append(m)
+
+# Next, drop zipcode and match only on state, credential and name
+for o in orders:
+    m = make_clean_matches(
+        samhsa_names_credential_state_zip.query(f'order=={o}')
+                                         .drop(columns='zip5'),
+        pc_names_credential_state_zip.drop(columns='zip5'),
+        id_use='samhsa_id', id_target='npi',
+        blocklist=final_crosswalk)
+    final_crosswalk = final_crosswalk.append(m)
 
 ##############################################################################
 ##############################################################################
