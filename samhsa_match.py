@@ -41,7 +41,7 @@ samhsa_names_credential_state_zip = (
             .assign(zip5=lambda df: df['Zip'].str[:5])[cols]
             .drop_duplicates())
      )
-
+# ADD SUFFIXES@@
 # First: match to NPI database
 npi_names_credential_state_zip = (
     npi.expanded_fullnames
@@ -75,10 +75,14 @@ for o in orders:
         blocklist=final_crosswalk)
     final_crosswalk = final_crosswalk.append(m)
 
+# Next, secondary practice locations
 # Next, try PECOS
 pc = physician_compare_select_vars(['NPI', 'Last Name', 'First Name',
                                     'Middle Name', 'Suffix', 'State',
                                     'Zip Code'])
+
+
+#####################################################################################
 
 # merges in all variations of names with all possible states that NPI is 
 # observed
