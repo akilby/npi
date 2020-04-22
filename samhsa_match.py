@@ -1,6 +1,7 @@
 
 import pandas as pd
-from npi.npi import NPI, convert_practitioner_data_to_long
+from npi.npi import (NPI, convert_practitioner_data_to_long,
+                     expand_names_in_sensible_ways)
 from npi.process.physician_compare import physician_compare_select_vars
 from npi.process.samhsa import SAMHSA
 
@@ -29,7 +30,6 @@ npi.retrieve('ptaxcode')
 npi.retrieve('practitioner_type')
 npi.retrieve('plocstatename')
 npi.retrieve('ploczip')
-npi.retrieve('secondary_practice_locations')
 
 # Master SAMHSA data to match
 s = SAMHSA()
@@ -41,7 +41,7 @@ samhsa_names_credential_state_zip = (
             .assign(zip5=lambda df: df['Zip'].str[:5])[cols]
             .drop_duplicates())
      )
-# ADD SUFFIXES@@
+# ADD SUFFIXES!
 # First: match to NPI database
 npi_names_credential_state_zip = (
     npi.expanded_fullnames
@@ -75,14 +75,46 @@ for o in orders:
         blocklist=final_crosswalk)
     final_crosswalk = final_crosswalk.append(m)
 
+
 # Next, secondary practice locations
+npi.retrieve('secondary_practice_locations')
+
 # Next, try PECOS
 pc = physician_compare_select_vars(['NPI', 'Last Name', 'First Name',
                                     'Middle Name', 'Suffix', 'State',
                                     'Zip Code'])
 
+col_rename = {'NPI': 'npi',
+              'Last Name': 'lastname',
+              'Middle Name': 'middlename',
+              'First Name': 'firstname',
+              'State': 'plocstatename'}
+pc_names_state_zip = (
+    pc.rename(columns=col_rename)
+      .assign(zip5=lambda df: df['Zip Code'].astype(str).str[:5])
+      .drop(columns=['Zip Code', 'Suffix'])
+      )
+names = pc_names_state_zip.drop(columns=['plocstatename', 'zip5'])
+names = names.assign(**{x: names[x].fillna('').astype(str)
+                        for x in names.columns if x != 'npi'})
+names = (names.pipe(expand_names_in_sensible_ways,
+                    idvar='npi',
+                    firstname='firstname',
+                    middlename='middlename',
+                    lastname='lastname')
+              .drop(columns='name')
+              .drop_duplicates())
 
-#####################################################################################
+
+pc_names_credential_state_zip = (
+    names.merge(pc_names_state_zip.drop(columns=['lastname', 'firstname', 
+                                                 'middlename']))
+         .merge(npi.practitioner_type.pipe(convert_practitioner_data_to_long)))
+
+##############################################################################
+##############################################################################
+##############################################################################
+##############################################################################
 
 # merges in all variations of names with all possible states that NPI is 
 # observed

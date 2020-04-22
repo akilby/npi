@@ -266,7 +266,7 @@ def process_variable(folder, variable, searchlist, final_weekly_updates=True):
     df = pd.concat(df_list, axis=0) if df_list else None
     if df_list and final_weekly_updates:
         u = read_and_process_weekly_updates(folder, variable)
-        if u:
+        if isinstance(u, pd.DataFrame):
             df = df.merge(u, on=['npi', 'month'], how='outer', indicator=True)
             df.loc[df._merge == "right_only",
                    '%s_x' % variable] = df['%s_y' % variable]
@@ -367,8 +367,7 @@ def update_all(max_jobs=6):
     # being properly separated out
     from jobs.run import RunScript
     list_of_jobs = []
-    # varl = USE_VAR_LIST.copy()
-    varl = ['ploctel']
+    varl = USE_VAR_LIST.copy()
     while len(varl) > 0:
         while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
                < max_jobs):

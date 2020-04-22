@@ -90,6 +90,7 @@ class SAMHSA(object):
         names = (
             names.merge(names.assign(order=1).groupby('samhsa_id').cumsum(),
                         left_index=True, right_index=True))
+        # ## ADD SUFFIX AND TREAT LIKE A MIDDLE NAME IN TERMS OF ORDER
         self.names = (names.sort_values(['samhsa_id', 'order'])
                            .reset_index(drop=True))
 
