@@ -413,7 +413,7 @@ def _normalize_entities(entities):
         raise ValueError("Value %s not a valid value for entities" % entities)
 
 
-def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
+def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname, suffix=None):
     '''
     For custom fuzzy matching
     '''
@@ -441,8 +441,19 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname):
     expanded_full.loc[expanded_full[middlename] != '', 'name'] = (
         expanded_full[firstname] + ' ' + expanded_full[middlename]
         + ' ' + expanded_full[lastname])
-    k = [idvar, firstname, middlename, lastname, 'name']
-    expanded_full = expanded_full[k].drop_duplicates()
+    if suffix:
+        suff = expanded_full.query('%s!=""' % suffix).copy()
+        suff2 = expanded_full.query('pnamesuffix!=""').copy()
+        suff['pnamesuffix'] = ''
+        suff2['name'] = suff2['name'] + " " + suff2['pnamesuffix']
+        expanded_full = (expanded_full.query('%s==""' % suffix)
+                                      .append(suff)
+                                      .append(suff2))
+    k = [idvar, firstname, middlename, lastname]
+    if suffix:
+        k = k + [suffix]
+    k = k + ['name']
+    expanded_full = expanded_full[k].drop_duplicates().reset_index(drop=True)
     return expanded_full
 
 
