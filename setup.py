@@ -10,7 +10,7 @@ setup(name='npi',
       packages=find_packages('src'),
       include_package_data=True,
       package_dir={'': 'src'},
-      install_requires=[],
+      install_requires=['pandas'],
       zip_safe=False,
       entry_points={}
       )
