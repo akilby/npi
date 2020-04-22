@@ -268,10 +268,12 @@ def process_variable(folder, variable, searchlist, final_weekly_updates=True):
         u = read_and_process_weekly_updates(folder, variable)
         if isinstance(u, pd.DataFrame):
             df = df.merge(u, on=['npi', 'month'], how='outer', indicator=True)
-            df.loc[df._merge == "right_only",
-                   '%s_x' % variable] = df['%s_y' % variable]
-            df.loc[df._merge == "both",
-                   '%s_x' % variable] = df['%s_y' % variable]
+            if (df._merge == "right_only").sum() != 0:
+                df.loc[df._merge == "right_only",
+                       '%s_x' % variable] = df['%s_y' % variable]
+            if (df._merge == "both").sum() != 0:
+                df.loc[df._merge == "both",
+                       '%s_x' % variable] = df['%s_y' % variable]
             df = (df.drop(columns=['_merge', '%s_y' % variable])
                     .rename(columns={'%s_x' % variable: variable}))
             assert (df[['npi', 'month']].drop_duplicates().shape[0]
