@@ -88,6 +88,14 @@ class NPI(object):
         from .utils.globalcache import c
         self.plname = c.get_name(self.src, self.npis, self.entity, 'plname')
 
+    def get_pnamesuffix(self):
+        if hasattr(self, 'pnamesuffix') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        name = c.get_name(self.src, self.npis, self.entity, 'pnamesuffix')
+        name['pnamesuffix'] = name.pnamesuffix.str.replace('.', '')
+        self.pnamesuffix = name
+
     def get_pfnameoth(self):
         if hasattr(self, 'pfnameoth') or self.entities in [2, [2]]:
             return
@@ -108,6 +116,15 @@ class NPI(object):
         from .utils.globalcache import c
         self.plnameoth = c.get_nameoth(
             self.src, self.npis, self.entity, 'plnameoth')
+
+    def get_pnamesuffixoth(self):
+        if hasattr(self, 'pnamesuffixoth') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        nameoth = c.get_nameoth(
+            self.src, self.npis, self.entity, 'pnamesuffixoth')
+        nameoth['pnamesuffixoth'] = nameoth.pnamesuffixoth.str.replace('.', '')
+        self.pnamesuffixoth = nameoth
 
     def get_pcredential(self):
         if hasattr(self, 'pcredential') or self.entities in [2, [2]]:
@@ -250,9 +267,11 @@ class NPI(object):
         self.get_pfname()
         self.get_pmname()
         self.get_plname()
+        self.get_pnamesuffix()
         self.get_pfnameoth()
         self.get_pmnameoth()
         self.get_plnameoth()
+        self.get_pnamesuffixoth()
 
         from .utils.globalcache import c
         self.fullnames = c.get_fullnames(self.pfname,
@@ -636,26 +655,33 @@ def get_cred(src, npis, entity, name_stub):
     return credential
 
 
-def get_fullnames(pfname, pmname, plname, pfnameoth, pmnameoth, plnameoth):
-    name_list = ['pfname', 'pmname', 'plname']
-    oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth']
+def get_fullnames(pfname, pmname, plname, pnamesuffix,
+                  pfnameoth, pmnameoth, plnameoth, pnamesuffixoth):
+    name_list = ['pfname', 'pmname', 'plname', 'pnamesuffix']
+    oth_list = ['pfnameoth', 'pmnameoth', 'plnameoth', 'pnamesuffixoth']
     ren = {'plnameoth': 'plname',
            'pfnameoth': 'pfname',
-           'pmnameoth': 'pmname'}
+           'pmnameoth': 'pmname',
+           'pnamesuffixoth': 'pnamesuffix'}
 
     fullnames = pd.merge(pfname, plname, how='outer')
     fullnames = pd.merge(fullnames, pmname, how='outer')
+    fullnames = pd.merge(fullnames, pnamesuffix, how='outer')
     fullnames = fullnames[['npi'] + name_list]
     merged = (pfnameoth.merge(plnameoth, how='outer')
                        .merge(pmnameoth, how='outer')
+                       .merge(pnamesuffixoth, how='outer')
                        .merge(pfname, how='left')
                        .merge(plname, how='left')
-                       .merge(pmname, how='left'))
+                       .merge(pmname, how='left')
+                       .merge(pnamesuffix, how='left'))
     merged.loc[merged.pfnameoth.isnull(), 'pfnameoth'] = merged.pfname
     merged.loc[merged.plnameoth.isnull(), 'plnameoth'] = merged.plname
 
     merged2 = merged.copy()
     merged.loc[merged.pmnameoth.isnull(), 'pmnameoth'] = merged.pmname
+    merged.loc[merged.pmnameoth.isnull(),
+               'pnamesuffixoth'] = merged.pnamesuffix
 
     def remove_duplicated_names(merged):
         merged = (merged.drop(columns=name_list)
@@ -672,8 +698,8 @@ def get_fullnames(pfname, pmname, plname, pfnameoth, pmnameoth, plnameoth):
     merged2 = remove_duplicated_names(merged2)
 
     merged = merged.append(merged2).drop_duplicates()
-    merged['othflag'] = 1
-    fullnames['othflag'] = 0
+    merged = merged.assign(othflag=1)
+    fullnames = fullnames.assign(othflag=0)
     fullnames = (fullnames.append(merged.rename(columns=ren))
                           .sort_values(['npi', 'othflag'])
                           .reset_index(drop=True))
