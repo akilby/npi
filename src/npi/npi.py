@@ -299,9 +299,12 @@ class NPI(object):
         f = self.fullnames.copy()
         f.drop(columns=['othflag'], inplace=True)
         idvar = 'npi'
-        (firstname, middlename, lastname) = ('pfname', 'pmname', 'plname')
+        (firstname, middlename, lastname, suffix) = ('pfname',
+                                                     'pmname',
+                                                     'plname',
+                                                     'pnamesuffix')
         self.expanded_fullnames = expand_names_in_sensible_ways(
-            f, idvar, firstname, middlename, lastname)
+            f, idvar, firstname, middlename, lastname, suffix)
 
     def get_secondary_practice_locations(self):
         if hasattr(self, 'secondary_practice_locations'):
@@ -413,7 +416,8 @@ def _normalize_entities(entities):
         raise ValueError("Value %s not a valid value for entities" % entities)
 
 
-def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname, suffix=None):
+def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
+                                  suffix=None):
     '''
     For custom fuzzy matching
     '''
