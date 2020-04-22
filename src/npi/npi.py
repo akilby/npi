@@ -277,9 +277,11 @@ class NPI(object):
         self.fullnames = c.get_fullnames(self.pfname,
                                          self.pmname,
                                          self.plname,
+                                         self.pnamesuffix,
                                          self.pfnameoth,
                                          self.pmnameoth,
-                                         self.plnameoth)
+                                         self.plnameoth,
+                                         self.pnamesuffixoth)
 
     def get_ptaxcode(self):
         if hasattr(self, 'ptaxcode'):
