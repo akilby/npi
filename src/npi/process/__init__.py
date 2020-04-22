@@ -62,6 +62,12 @@ PC_COL_DICT = {'NPI': 'NPI',
 PC_COL_DICT_REVERSE = {x: y for y, x in PC_COL_DICT.items()}
 
 DTYPES = {'NPI': 'int',
+          'Last Name': 'string',
+          'First Name': 'string',
+          'Middle Name': 'string',
+          'Suffix': 'string',
+          'State': 'string',
+          'Zip Code': 'Int64',
           'Graduation year': 'Int64',
           'Medical school name': 'string',
           'Group Practice PAC ID': 'Int64',

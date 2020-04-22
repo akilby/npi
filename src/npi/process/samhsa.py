@@ -13,6 +13,7 @@ class SAMHSA(object):
     def __init__(self, src=source_file):
         self.source_file = src
         self.samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
+        self.get_names()
 
     def make_samhsa_id(self, samhsa, idvars=['NameFull', 'DateLastCertified',
                                              'PractitionerType']):
@@ -81,7 +82,16 @@ class SAMHSA(object):
                                 columns={'NameFull': 'name'}))
                             .drop_duplicates())
 
-        self.names = newnames.merge(names[['samhsa_id', 'Credential String']])
+        names = newnames.merge(names[['samhsa_id', 'Credential String']])
+        names = names.drop(columns='Credential String')
+        names = (names.sort_values(['samhsa_id', 'middlename'],
+                                   ascending=False)
+                      .reset_index(drop=True))
+        names = (
+            names.merge(names.assign(order=1).groupby('samhsa_id').cumsum(),
+                        left_index=True, right_index=True))
+        self.names = (names.sort_values(['samhsa_id', 'order'])
+                           .reset_index(drop=True))
 
 
 def credential_suffixes():

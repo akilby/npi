@@ -878,6 +878,21 @@ def credential_taxonomy_classification_pairs(credentials,
     else:
         raise Exception('cannot do both search_credential and search_taxonomy')
 
+
+def convert_practitioner_data_to_long(df,
+                                      colname="PractitionerType",
+                                      types=['MD/DO', 'NP', 'PA']):
+    return (df.set_index('npi')
+              .stack()
+              .rename('indic')
+              .reset_index()
+              .query('indic==1')
+              .rename(columns={'level_1': colname})
+              .drop(columns='indic')
+              .merge(pd.DataFrame({colname: types}))
+            )
+
+
 #def get_training_dates(src, entity):
 #     '''
 #     This is extremely rough and should get replaced
