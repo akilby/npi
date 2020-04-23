@@ -29,12 +29,13 @@ class PECOS(object):
                 init_vars, drop_duplicates, date_var)
 
     def get_names(self):
+        from .utils.globalcache import c
         cols = ['NPI', 'Last Name', 'First Name', 'Middle Name', 'Suffix']
         if hasattr(self, 'physician_compare'):
             cols = [x for x in cols if x not in self.physician_compare.columns]
         if cols:
             varl = list(set(['NPI'] + cols))
-            pc = physician_compare_select_vars(varl)
+            pc = c.physician_compare_select_vars(varl)
             pc = self.physician_compare.merge(pc)
         else:
             pc = self.physician_compare
