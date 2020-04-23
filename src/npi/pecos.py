@@ -13,9 +13,42 @@ they still practice
 import pandas as pd
 
 from .download.medical_schools import final_data_path as med_school_path
+from .npi import expand_names_in_sensible_ways
 from .process.medicare import part_b_files, part_d_files
 from .process.physician_compare import physician_compare_select_vars
 from .utils.utils import isid
+
+# init_vars = ['NPI', 'Last Name', 'First Name', 'Middle Name', 'Suffix', 'State', 'Zip Code']
+
+
+class PECOS(object):
+    def __init__(self, init_vars=[], drop_duplicates=True, date_var=False):
+        from .utils.globalcache import c
+        if init_vars:
+            self.physician_compare = c.physician_compare_select_vars(
+                init_vars, drop_duplicates, date_var)
+
+    def get_names(self):
+        cols = ['NPI', 'Last Name', 'First Name', 'Middle Name', 'Suffix']
+        if hasattr(self, 'physician_compare'):
+            cols = [x for x in cols if x not in self.physician_compare.columns]
+        if cols:
+            varl = list(set(['NPI'] + cols))
+            pc = physician_compare_select_vars(varl)
+            pc = self.physician_compare.merge(pc)
+        else:
+            pc = self.physician_compare
+
+        pc['Suffix'] = pc['Suffix'].str.replace('.', '')
+        pc = pc.assign(**{x: pc[x].astype(object).fillna('').astype(str)
+                          for x in pc.columns if x != 'NPI'})
+        names = (pc.pipe(expand_names_in_sensible_ways,
+                         idvar='NPI',
+                         firstname='First Name',
+                         middlename='Middle Name',
+                         lastname='Last Name',
+                         suffix='Suffix'))
+        self.names = names
 
 
 def medicare_program_engagement():

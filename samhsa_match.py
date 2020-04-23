@@ -6,6 +6,77 @@ from npi.process.physician_compare import physician_compare_select_vars
 from npi.process.samhsa import SAMHSA
 
 
+def getcol(df, src, idvar, col, newname):
+    return (df.merge(src[[idvar, col]].drop_duplicates())
+              .rename(columns={col: newname}))
+
+
+def reformat_dataframes(source, cols, **kwargs):
+    '''by default includes name, then adds
+    other variables in a systematic fashion
+    can use npi_source="ploc2" for secondary practice locations
+    can use physician_compare=True to indicate source is physician compare
+    if so have to include names=
+    '''
+    if isinstance(source, NPI):
+        df = source.expanded_fullnames.copy()
+        idvar = 'npi'
+        if 'practitioner_type' in cols:
+            src = (source.practitioner_type
+                         .pipe(convert_practitioner_data_to_long))
+            df = df.pipe(
+                getcol, src, idvar, 'PractitionerType', 'practitioner_type')
+        if 'state' in cols:
+            if not kwargs:
+                src = (source
+                       .plocstatename.drop(columns='month')
+                       .drop_duplicates())
+                df = df.pipe(getcol, src, idvar, 'plocstatename', 'state')
+            elif kwargs['npi_source'] == 'ploc2':
+                src = (source
+                       .secondary_practice_locations[[idvar, 'ploc2statename']]
+                       .drop_duplicates())
+                df = df.pipe(getcol, src, idvar, 'ploc2statename', 'state')
+        if 'zip5' in cols:
+            if not kwargs:
+                src = (source.ploczip
+                             .assign(zip5=lambda x: x['ploczip'].str[:5])
+                             .drop(columns=['month', 'ploczip'])
+                             .drop_duplicates())
+            elif kwargs['npi_source'] == 'ploc2':
+                src = (source
+                       .secondary_practice_locations
+                       .assign(
+                        zip5=lambda x: x['ploc2zip'].str[:5])[[idvar, 'zip5']]
+                       .drop_duplicates())
+            df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
+    elif isinstance(source, SAMHSA):
+        df = source.names.copy()
+        idvar = 'samhsa_id'
+        if 'practitioner_type' in cols:
+            df = df.pipe(getcol, source.samhsa, idvar, 'PractitionerType',
+                         'practitioner_type')
+        if 'state' in cols:
+            df = df.pipe(getcol, source.samhsa, idvar, 'State', 'state')
+        if 'zip5' in cols:
+            src = (source
+                   .samhsa
+                   .assign(zip5=lambda df: df['Zip'].str[:5])[[idvar, 'zip5']]
+                   .drop_duplicates())
+            df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
+    # should manage PC as an object
+    elif isinstance(source, PHYS_COMPARE):
+        df = names
+        idvar = 'npi'
+        if 'practitioner_type' in cols:
+            src = (source.practitioner_type
+                         .pipe(convert_practitioner_data_to_long))
+            df = df.pipe(
+                getcol, src, idvar, 'PractitionerType', 'practitioner_type')
+
+    return df.drop_duplicates()
+
+
 def make_clean_matches(df1, df2, id_use, id_target,
                        blocklist=pd.DataFrame()):
     '''merges on common columns'''
@@ -22,68 +93,121 @@ def make_clean_matches(df1, df2, id_use, id_target,
     return m
 
 
-npi = NPI(entities=1)
-npi.retrieve('fullnames')
-npi.retrieve('expanded_fullnames')
-npi.retrieve('credentials')
-npi.retrieve('ptaxcode')
-npi.retrieve('practitioner_type')
-npi.retrieve('plocstatename')
-npi.retrieve('ploczip')
+def make_clean_matches_iterate(df1, idvar1, ordervar, df2, idvar2, blocklist):
+    orders = sorted((df1[ordervar].value_counts().index.tolist()))
+    for o in orders:
+        m = make_clean_matches(
+            df1.query(f'order=={o}'),
+            df2,
+            id_use=idvar1, id_target=idvar2,
+            blocklist=blocklist)
+        blocklist = blocklist.append(m)
+    return blocklist
 
-# Master SAMHSA data to match
-s = SAMHSA()
-cols = ['PractitionerType', 'plocstatename', 'zip5', 'samhsa_id']
-samhsa_names_credential_state_zip = (
-    s.names
-     .merge(s.samhsa
-            .rename(columns={'State': 'plocstatename'})
-            .assign(zip5=lambda df: df['Zip'].str[:5])[cols]
-            .drop_duplicates())
-     )
+
+def main():
+    s = SAMHSA()
+    # s.retrieve('names')
+    npi = NPI(entities=1)
+    npi.retrieve('fullnames')
+    npi.retrieve('expanded_fullnames')
+    npi.retrieve('credentials')
+    npi.retrieve('ptaxcode')
+    npi.retrieve('practitioner_type')
+    npi.retrieve('plocstatename')
+    npi.retrieve('ploczip')
+    npi.retrieve('secondary_practice_locations')
+
+    # should manage PC as an object
+    pc = physician_compare_select_vars(['NPI', 'Last Name', 'First Name',
+                                        'Middle Name', 'Suffix', 'State',
+                                        'Zip Code'])
+    pc['Suffix'] = pc['Suffix'].str.replace('.', '')
+    pc = pc.assign(**{x: pc[x].fillna('').astype(str)
+                      for x in pc.columns if x != 'NPI'})
+    pc = pc.rename(columns={'NPI': 'npi'})
+    pc_names = (pc.pipe(expand_names_in_sensible_ways,
+                        idvar='npi',
+                        firstname='First Name',
+                        middlename='Middle Name',
+                        lastname='Last Name',
+                        suffix='Suffix'))
+
+    # matching data to generate a crosswalk
+    final_crosswalk = pd.DataFrame()
+
+    # 1. exact match on name, practitioner type, state, and zip code
+    df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state', 'zip5'])
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 2. exact match on name, practitioner type, and state
+    df1 = reformat_dataframes(s, ['practitioner_type', 'state'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state'])
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 3. exact match on name, practitioner type, and secondary practice state
+    # and zip code
+    df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state', 'zip5'],
+                              npi_source="ploc2")
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 4. exact match on name, practitioner type, and secondary practice state
+    df1 = reformat_dataframes(s, ['practitioner_type', 'state'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state'],
+                              npi_source="ploc2")
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 5. 
+    df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
+    df2 = reformat_dataframes(pc, ['practitioner_type', 'state', 'zip5'])
+
+    # 6. 
+
+    assert final_crosswalk.samhsa_id.is_unique
+    assert final_crosswalk.npi.is_unique
 # ADD SUFFIXES!
-suffixes = ['JR', 'III', 'II', 'SR', 'IV']
-# First: match to NPI database
-npi_names_credential_state_zip = (
-    npi.expanded_fullnames
-       .merge(npi.practitioner_type.pipe(convert_practitioner_data_to_long))
-       .merge(npi.plocstatename.drop(columns='month').drop_duplicates())
-       .merge(npi.ploczip
-              .assign(zip5=lambda df: df['ploczip'].str[:5])
-              .drop(columns=['month', 'ploczip'])
-              .drop_duplicates())
-       )
+# suffixes = ['JR', 'III', 'II', 'SR', 'IV']
+# # First: match to NPI database
+# npi_names_credential_state_zip = (
+#     npi.expanded_fullnames
+#        .merge(npi.practitioner_type.pipe(convert_practitioner_data_to_long))
+#        .merge(npi.plocstatename.drop(columns='month').drop_duplicates())
+#        .merge(npi.ploczip
+#               .assign(zip5=lambda df: df['ploczip'].str[:5])
+#               .drop(columns=['month', 'ploczip'])
+#               .drop_duplicates())
+#        )
 
-orders = (samhsa_names_credential_state_zip['order'].value_counts()
-                                                    .index.tolist())
-# Match on zipcode, state, credential and name
-final_crosswalk = pd.DataFrame()
-for o in orders:
-    m = make_clean_matches(
-        samhsa_names_credential_state_zip.query(f'order=={o}'),
-        npi_names_credential_state_zip,
-        id_use='samhsa_id', id_target='npi',
-        blocklist=final_crosswalk)
-    final_crosswalk = final_crosswalk.append(m)
+
+
+
 
 # Next, drop zipcode and match only on state, credential and name
-for o in orders:
-    m = make_clean_matches(
-        samhsa_names_credential_state_zip.query(f'order=={o}')
-                                         .drop(columns='zip5'),
-        npi_names_credential_state_zip.drop(columns='zip5'),
-        id_use='samhsa_id', id_target='npi',
-        blocklist=final_crosswalk)
-    final_crosswalk = final_crosswalk.append(m)
+# for o in orders:
+#     m = make_clean_matches(
+#         samhsa_names_credential_state_zip.query(f'order=={o}')
+#                                          .drop(columns='zip5'),
+#         npi_names_credential_state_zip.drop(columns='zip5'),
+#         id_use='samhsa_id', id_target='npi',
+#         blocklist=final_crosswalk)
+#     final_crosswalk = final_crosswalk.append(m)
 
 
 # Next, secondary practice locations
-npi.retrieve('secondary_practice_locations')
+
 
 # Next, try PECOS
-pc = physician_compare_select_vars(['NPI', 'Last Name', 'First Name',
-                                    'Middle Name', 'Suffix', 'State',
-                                    'Zip Code'])
+
 
 col_rename = {'NPI': 'npi',
               'Last Name': 'lastname',
