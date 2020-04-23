@@ -447,9 +447,9 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
         + ' ' + expanded_full[lastname])
     if suffix:
         suff = expanded_full.query('%s!=""' % suffix).copy()
-        suff2 = expanded_full.query('pnamesuffix!=""').copy()
-        suff['pnamesuffix'] = ''
-        suff2['name'] = suff2['name'] + " " + suff2['pnamesuffix']
+        suff2 = expanded_full.query('%s!=""' % suffix).copy()
+        suff[suffix] = ''
+        suff2['name'] = suff2['name'] + " " + suff2[suffix]
         expanded_full = (expanded_full.query('%s==""' % suffix)
                                       .append(suff)
                                       .append(suff2))
