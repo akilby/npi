@@ -29,7 +29,12 @@ from . import DTYPES, PC_COL_DICT, PC_COL_DICT_REVERSE, PC_COLNAMES
 
 
 def expand_list_of_vars(variables):
-    return ['NPI'] + [PC_COL_DICT_REVERSE[x] for x in variables] + variables
+    mapping = pd.DataFrame.from_dict(PC_COL_DICT, orient='index')
+    othlist = (mapping.reset_index()
+                      .merge(pd.DataFrame({0: variables}))['index']
+                      .values.tolist())
+    # othlist = [PC_COL_DICT_REVERSE[x] for x in variables]
+    return ['NPI'] + othlist + variables
 
 
 def detect_date(string):

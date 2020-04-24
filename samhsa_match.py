@@ -151,6 +151,8 @@ def main():
 
     practypes = ['MD/DO', 'NP', 'PA', 'CRNA', 'CNM', 'CNS']
 
+    # ADD TELEPHONE
+    
     # 1. exact match on name, practitioner type, state, and zip code
     df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
     df2 = conform_data_sources(npi, ['practitioner_type', 'state', 'zip5'],
@@ -202,7 +204,6 @@ def main():
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
-
     # 7. exact match on name, practitioner type, in NPI
     df1 = conform_data_sources(s, ['practitioner_type'])
     df2 = conform_data_sources(npi, ['practitioner_type'],
@@ -211,7 +212,7 @@ def main():
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
-    # 8. PECOS: exact match on name, type, state
+    # 8. PECOS: exact match on name, type
     df1 = conform_data_sources(s, ['practitioner_type'])
     df2 = conform_data_sources(pecos, ['practitioner_type'],
                                practypes=practypes)
@@ -223,8 +224,37 @@ def main():
     assert final_crosswalk.samhsa_id.is_unique
     assert final_crosswalk.npi.is_unique
 
+    # 9. exact match on name, state, and zip code
+    df1 = conform_data_sources(s, ['state', 'zip5'])
+    df2 = conform_data_sources(npi, ['state', 'zip5'])
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
 
+    # 10. PECOS: exact match on name, state, and zip
+    df1 = conform_data_sources(s, ['state', 'zip5'])
+    df2 = conform_data_sources(pecos, ['state', 'zip5'],)
+    df2 = df2.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
 
+    # 11. exact match on name, state
+    df1 = conform_data_sources(s, ['state'])
+    df2 = conform_data_sources(npi, ['state'])
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 12. PECOS: exact match on name, state
+    df1 = conform_data_sources(s, ['state'])
+    df2 = conform_data_sources(pecos, ['state'],)
+    df2 = df2.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # ## REMOVE CONFLICTING MIDDLE NAMES AND SUFFIXES
 
 # ADD SUFFIXES!
 # suffixes = ['JR', 'III', 'II', 'SR', 'IV']
