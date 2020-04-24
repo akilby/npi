@@ -4,7 +4,7 @@ import re
 import numpy as np
 import pandas as pd
 
-from ..npi import expand_names_in_sensible_ways
+from .npi import expand_names_in_sensible_ways
 
 source_file = ('/work/akilby/npi/samhsa_processing/'
                'FOIA_12312019_datefilled_clean_NPITelefill.csv')
