@@ -2,8 +2,9 @@
 import pandas as pd
 from npi.npi import (NPI, convert_practitioner_data_to_long,
                      expand_names_in_sensible_ways)
+from npi.pecos import PECOS
 from npi.process.physician_compare import physician_compare_select_vars
-from npi.process.samhsa import SAMHSA
+from npi.samhsa import SAMHSA
 
 
 def getcol(df, src, idvar, col, newname):
@@ -15,15 +16,15 @@ def reformat_dataframes(source, cols, **kwargs):
     '''by default includes name, then adds
     other variables in a systematic fashion
     can use npi_source="ploc2" for secondary practice locations
-    can use physician_compare=True to indicate source is physician compare
-    if so have to include names=
+    need to pass kwargs=practypes
     '''
     if isinstance(source, NPI):
         df = source.expanded_fullnames.copy()
         idvar = 'npi'
         if 'practitioner_type' in cols:
             src = (source.practitioner_type
-                         .pipe(convert_practitioner_data_to_long))
+                         .pipe(convert_practitioner_data_to_long,
+                               kwargs['practypes']))
             df = df.pipe(
                 getcol, src, idvar, 'PractitionerType', 'practitioner_type')
         if 'state' in cols:
@@ -64,16 +65,22 @@ def reformat_dataframes(source, cols, **kwargs):
                    .assign(zip5=lambda df: df['Zip'].str[:5])[[idvar, 'zip5']]
                    .drop_duplicates())
             df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
-    # should manage PC as an object
-    elif isinstance(source, PHYS_COMPARE):
-        df = names
-        idvar = 'npi'
+    elif isinstance(source, PECOS):
+        df = source.names.copy()
+        idvar = 'NPI'
         if 'practitioner_type' in cols:
-            src = (source.practitioner_type
-                         .pipe(convert_practitioner_data_to_long))
-            df = df.pipe(
-                getcol, src, idvar, 'PractitionerType', 'practitioner_type')
+            df = df.pipe(getcol, source.practitioner_type, idvar, 'Credential',
+                         'practitioner_type')
+            df.loc[df.practitioner_type.isin(['MD', 'DO']),
+                   'practitioner_type'] = 'MD/DO'
+            df.loc[df.practitioner_type.isin(['CNA']),
+                   'practitioner_type'] = 'CRNA'
+            df = df[df.practitioner_type.isin(kwargs['practypes'])]
+        if 'state' in cols:
+        
+        if 'zip5' in cols:
 
+        df = df.rename(columns={'NPI': 'npi'})
     return df.drop_duplicates()
 
 
@@ -117,35 +124,26 @@ def main():
     npi.retrieve('plocstatename')
     npi.retrieve('ploczip')
     npi.retrieve('secondary_practice_locations')
-
-    # should manage PC as an object
-    pc = physician_compare_select_vars(['NPI', 'Last Name', 'First Name',
-                                        'Middle Name', 'Suffix', 'State',
-                                        'Zip Code'])
-    pc['Suffix'] = pc['Suffix'].str.replace('.', '')
-    pc = pc.assign(**{x: pc[x].fillna('').astype(str)
-                      for x in pc.columns if x != 'NPI'})
-    pc = pc.rename(columns={'NPI': 'npi'})
-    pc_names = (pc.pipe(expand_names_in_sensible_ways,
-                        idvar='npi',
-                        firstname='First Name',
-                        middlename='Middle Name',
-                        lastname='Last Name',
-                        suffix='Suffix'))
+    pecos = PECOS(['NPI', 'Last Name', 'First Name', 'Middle Name',
+                   'Suffix', 'State', 'Zip Code'])
+    pecos.retrieve('names')
+    pecos.retrieve('practitioner_type')
 
     # matching data to generate a crosswalk
     final_crosswalk = pd.DataFrame()
 
+    practypes = ['MD/DO', 'NP', 'PA', 'CRNA', 'CNM', 'CNS']
+
     # 1. exact match on name, practitioner type, state, and zip code
     df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
-    df2 = reformat_dataframes(npi, ['practitioner_type', 'state', 'zip5'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state', 'zip5'], practypes=practypes)
     final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
     # 2. exact match on name, practitioner type, and state
     df1 = reformat_dataframes(s, ['practitioner_type', 'state'])
-    df2 = reformat_dataframes(npi, ['practitioner_type', 'state'])
+    df2 = reformat_dataframes(npi, ['practitioner_type', 'state'], practypes=practypes)
     final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
@@ -154,7 +152,7 @@ def main():
     # and zip code
     df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
     df2 = reformat_dataframes(npi, ['practitioner_type', 'state', 'zip5'],
-                              npi_source="ploc2")
+                              practypes=practypes, npi_source="ploc2")
     final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
@@ -162,14 +160,14 @@ def main():
     # 4. exact match on name, practitioner type, and secondary practice state
     df1 = reformat_dataframes(s, ['practitioner_type', 'state'])
     df2 = reformat_dataframes(npi, ['practitioner_type', 'state'],
-                              npi_source="ploc2")
+                              practypes=practypes, npi_source="ploc2")
     final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
     # 5. 
     df1 = reformat_dataframes(s, ['practitioner_type', 'state', 'zip5'])
-    df2 = reformat_dataframes(pc, ['practitioner_type', 'state', 'zip5'])
+    df2 = reformat_dataframes(pecos, ['practitioner_type', 'state', 'zip5'], practypes=practypes)
 
     # 6. 
 

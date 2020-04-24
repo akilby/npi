@@ -18,8 +18,6 @@ from .process.medicare import part_b_files, part_d_files
 from .process.physician_compare import physician_compare_select_vars
 from .utils.utils import isid
 
-# init_vars = ['NPI', 'Last Name', 'First Name', 'Middle Name', 'Suffix', 'State', 'Zip Code']
-
 
 class PECOS(object):
     def __init__(self, init_vars=[], drop_duplicates=True, date_var=False):
@@ -28,13 +26,19 @@ class PECOS(object):
             self.physician_compare = c.physician_compare_select_vars(
                 init_vars, drop_duplicates, date_var)
 
+    def retrieve(self, thing):
+        getattr(self, f'get_{thing}')()
+
     def get_names(self):
+        if hasattr(self, 'names'):
+            return
         from .utils.globalcache import c
         cols = ['NPI', 'Last Name', 'First Name', 'Middle Name', 'Suffix']
         if hasattr(self, 'physician_compare'):
-            cols = [x for x in cols if x not in self.physician_compare.columns]
-        if cols:
-            varl = list(set(['NPI'] + cols))
+            cols2 = [x for x in cols
+                     if x not in self.physician_compare.columns]
+        if cols2:
+            varl = list(set(['NPI'] + cols2))
             pc = c.physician_compare_select_vars(varl)
             pc = self.physician_compare.merge(pc)
         else:
@@ -52,6 +56,45 @@ class PECOS(object):
                          lastname='Last Name',
                          suffix='Suffix'))
         self.names = names
+
+    def get_practitioner_type(self):
+        """Gets credentials and primary specialty. Primary specialty is much
+        more complete
+        than credentials, so I check that specialty maps to credentials
+        and impute
+        credentials from specialty. Can also be verified in the NPI. Note
+        in imputation I can't distinguish between MD and DO."""
+        if hasattr(self, 'practitioner_type'):
+            return
+        from .utils.globalcache import c
+        cols = ['NPI', 'Credential', 'Primary specialty']
+        if hasattr(self, 'physician_compare'):
+            cols2 = [x for x in cols
+                     if x not in self.physician_compare.columns]
+        if cols2:
+            varl = ['NPI'] + cols2 if 'NPI' not in cols2 else cols2
+            pc = c.physician_compare_select_vars(varl)
+        else:
+            pc = self.physician_compare[varl]
+        pc2 = (pc.drop(columns='NPI').dropna()
+                 .query('Credential!=" "').reset_index(drop=True))
+        pc2.loc[pc2['Credential'].isin(['MD', 'DO']), 'Credential'] = 'MD/DO'
+        pc2 = (pc2.groupby(['Primary specialty', 'Credential'])
+                  .size().reset_index()
+                  .merge(pc2.groupby(['Primary specialty', 'Credential'])
+                            .size().groupby(level=0).max().reset_index()))
+        mapping = (pc2.rename(columns={0: 'count'})
+                      .query('count>150').drop(columns='count'))
+        pc3 = pc.merge(mapping, on='Primary specialty')
+        pc3.loc[pc3.Credential_x.isnull() &
+                pc3.Credential_y.notnull(), 'Credential_x'] = pc3.Credential_y
+        pc3.loc[(pc3.Credential_x == " ") &
+                pc3.Credential_y.notnull(), 'Credential_x'] = pc3.Credential_y
+        pc3 = (pc3.drop(columns='Credential_y')
+                  .drop_duplicates()
+                  .rename(columns={'Credential_x': 'Credential'}))
+        self.practitioner_type = (pc3.merge(
+            pc[['NPI', 'Primary specialty']].drop_duplicates(), how='right'))
 
 
 def medicare_program_engagement():

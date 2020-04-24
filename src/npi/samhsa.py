@@ -16,6 +16,9 @@ class SAMHSA(object):
         self.samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
         self.get_names()
 
+    def retrieve(self, thing):
+        getattr(self, f'get_{thing}')()
+
     def make_samhsa_id(self, samhsa, idvars=['NameFull', 'DateLastCertified',
                                              'PractitionerType']):
         """
@@ -32,6 +35,8 @@ class SAMHSA(object):
         return samhsa.merge(ids)
 
     def get_names(self, namecol='NameFull'):
+        if hasattr(self, 'names'):
+            return
         names = (self.samhsa[[namecol, 'samhsa_id']]
                      .drop_duplicates()
                      .sort_values('samhsa_id')
