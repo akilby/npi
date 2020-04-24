@@ -58,6 +58,26 @@ PC_COL_DICT = {'NPI': 'NPI',
                'hosp_afl_lbn_4': 'Hospital affiliation LBN 4',
                'hosp_afl_5': 'Hospital affiliation CCN 5',
                'hosp_afl_lbn_5': 'Hospital affiliation LBN 5',
+               'Claims based hospital affiliation CCN 1':
+               'Hospital affiliation CCN 1',
+               'Claims based hospital affiliation LBN 1':
+               'Hospital affiliation LBN 1',
+               'Claims based hospital affiliation CCN 2':
+               'Hospital affiliation CCN 2',
+               'Claims based hospital affiliation LBN 2':
+               'Hospital affiliation LBN 2',
+               'Claims based hospital affiliation CCN 3':
+               'Hospital affiliation CCN 3',
+               'Claims based hospital affiliation LBN 3':
+               'Hospital affiliation LBN 3',
+               'Claims based hospital affiliation CCN 4':
+               'Hospital affiliation CCN 4',
+               'Claims based hospital affiliation LBN 4':
+               'Hospital affiliation LBN 4',
+               'Claims based hospital affiliation CCN 5':
+               'Hospital affiliation CCN 5',
+               'Claims based hospital affiliation LBN 5':
+               'Hospital affiliation LBN 5',
                'assgn': 'Professional accepts Medicare Assignment'}
 
 PC_COL_DICT_REVERSE = {x: y for y, x in PC_COL_DICT.items()}
