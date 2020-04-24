@@ -229,7 +229,7 @@ class NPI(object):
                                self.entity,
                                self.removaldate,
                                self.entities,
-                               'ploczip')
+                               'ploctel')
         self.ploctel = loctel
 
     def get_credentials(self):

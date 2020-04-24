@@ -56,6 +56,18 @@ def conform_NPI(source, cols, **kwargs):
                     zip5=lambda x: x['ploc2zip'].str[:5])[[idvar, 'zip5']]
                    .drop_duplicates())
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
+    if 'tel' in cols:
+        if not kwargs or 'npi_source' not in kwargs.keys():
+            src = (source
+                   .ploctel.drop(columns='month')
+                   .drop_duplicates())
+            df = df.pipe(getcol, src, idvar, 'ploctel', 'tel')
+        elif 'npi_source' in kwargs.keys() and kwargs['npi_source'] == 'ploc2':
+            src = (source
+                   .secondary_practice_locations[[idvar, 'ploc2statename']]
+                   .drop_duplicates())
+            df = df.pipe(getcol, src, idvar, 'ploc2statename', 'state')
+
     return df.drop_duplicates()
 
 
@@ -102,6 +114,7 @@ def conform_PECOS(source, cols, **kwargs):
 def make_clean_matches(df1, df2, id_use, id_target,
                        blocklist=pd.DataFrame()):
     '''merges on common columns'''
+    # DELETE IF NAME CONFLICTS IN MATCHES
     if not blocklist.empty:
         df1 = (df1.merge(blocklist, how='left', indicator=True)
                   .query('_merge=="left_only"'))[df1.columns]
@@ -122,12 +135,23 @@ def make_clean_matches_iterate(df1, idvar1, ordervar, df2, idvar2, blocklist):
             df1.query(f'order=={o}'),
             df2,
             id_use=idvar1, id_target=idvar2,
-            blocklist=blocklist)
+            blocklist=blocklist[[x for x in blocklist.columns
+                                 if x != 'order']])
+        m['order'] = o
         blocklist = blocklist.append(m)
     return blocklist
 
 
+out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())  
+o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())            
+o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())                
+lo1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="left_only"')[['samhsa_id','npi']].drop_duplicates()
+ro1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="right_only"')[['samhsa_id','npi']].drop_duplicates()
+lo1.merge(ro1)
+
+
 def main():
+    # don't exploit timing here
     s = SAMHSA()
     s.retrieve('names')
 
@@ -139,6 +163,7 @@ def main():
     npi.retrieve('practitioner_type')
     npi.retrieve('plocstatename')
     npi.retrieve('ploczip')
+    npi.retrieve('ploctel')
     npi.retrieve('secondary_practice_locations')
 
     pecos = PECOS(['NPI', 'Last Name', 'First Name', 'Middle Name',
@@ -151,8 +176,8 @@ def main():
 
     practypes = ['MD/DO', 'NP', 'PA', 'CRNA', 'CNM', 'CNS']
 
-    # ADD TELEPHONE
-    
+    # 0. ADD TELEPHONE
+
     # 1. exact match on name, practitioner type, state, and zip code
     df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
     df2 = conform_data_sources(npi, ['practitioner_type', 'state', 'zip5'],
