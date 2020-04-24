@@ -33,23 +33,23 @@ def conform_NPI(source, cols, **kwargs):
         df = df.pipe(
             getcol, src, idvar, 'PractitionerType', 'practitioner_type')
     if 'state' in cols:
-        if not kwargs:
+        if not kwargs or 'npi_source' not in kwargs.keys():
             src = (source
                    .plocstatename.drop(columns='month')
                    .drop_duplicates())
             df = df.pipe(getcol, src, idvar, 'plocstatename', 'state')
-        elif kwargs['npi_source'] == 'ploc2':
+        elif 'npi_source' in kwargs.keys() and kwargs['npi_source'] == 'ploc2':
             src = (source
                    .secondary_practice_locations[[idvar, 'ploc2statename']]
                    .drop_duplicates())
             df = df.pipe(getcol, src, idvar, 'ploc2statename', 'state')
     if 'zip5' in cols:
-        if not kwargs:
+        if not kwargs or 'npi_source' not in kwargs.keys():
             src = (source.ploczip
                          .assign(zip5=lambda x: x['ploczip'].str[:5])
                          .drop(columns=['month', 'ploczip'])
                          .drop_duplicates())
-        elif kwargs['npi_source'] == 'ploc2':
+        elif 'npi_source' in kwargs.keys() and kwargs['npi_source'] == 'ploc2':
             src = (source
                    .secondary_practice_locations
                    .assign(
