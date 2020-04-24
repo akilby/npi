@@ -79,7 +79,17 @@ DTYPES = {'NPI': 'int',
           'Secondary specialty 1': 'string',
           'Secondary specialty 2': 'string',
           'Secondary specialty 3': 'string',
-          'Secondary specialty 4': 'string'
+          'Secondary specialty 4': 'string',
+          'Hospital affiliation CCN 1': 'Int64',
+          'Hospital affiliation LBN 1': 'string',
+          'Hospital affiliation CCN 2': 'Int64',
+          'Hospital affiliation LBN 2': 'string',
+          'Hospital affiliation CCN 3': 'Int64',
+          'Hospital affiliation LBN 3': 'string',
+          'Hospital affiliation CCN 4': 'Int64',
+          'Hospital affiliation LBN 4': 'string',
+          'Hospital affiliation CCN 5': 'Int64',
+          'Hospital affiliation LBN 5': 'string',
           }
 
 
