@@ -40,9 +40,11 @@ class PECOS(object):
         else:
             pc = self.physician_compare
 
-        pc['Suffix'] = pc['Suffix'].str.replace('.', '')
-        pc = pc.assign(**{x: pc[x].astype(object).fillna('').astype(str)
+        pc = pc.assign(**{x: pc[x].astype(object)
+                                  .fillna('').astype(str).str.strip()
                           for x in pc.columns if x != 'NPI'})
+        pc['Suffix'] = pc['Suffix'].str.replace('.', '')
+        pc = pc[cols].drop_duplicates()
         names = (pc.pipe(expand_names_in_sensible_ways,
                          idvar='NPI',
                          firstname='First Name',
