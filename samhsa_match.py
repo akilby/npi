@@ -202,10 +202,26 @@ def main():
                                                  df2, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
+
+    # 7. exact match on name, practitioner type, in NPI
+    df1 = conform_data_sources(s, ['practitioner_type'])
+    df2 = conform_data_sources(npi, ['practitioner_type'],
+                               practypes=practypes)
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
+    # 8. PECOS: exact match on name, type, state
+    df1 = conform_data_sources(s, ['practitioner_type'])
+    df2 = conform_data_sources(pecos, ['practitioner_type'],
+                               practypes=practypes)
+    df2 = df2.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+
     assert final_crosswalk.samhsa_id.is_unique
     assert final_crosswalk.npi.is_unique
-
-
 
 
 
