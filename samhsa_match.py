@@ -64,9 +64,9 @@ def conform_NPI(source, cols, **kwargs):
             df = df.pipe(getcol, src, idvar, 'ploctel', 'tel')
         elif 'npi_source' in kwargs.keys() and kwargs['npi_source'] == 'ploc2':
             src = (source
-                   .secondary_practice_locations[[idvar, 'ploc2statename']]
+                   .secondary_practice_locations[[idvar, 'ploc2tel']]
                    .drop_duplicates())
-            df = df.pipe(getcol, src, idvar, 'ploc2statename', 'state')
+            df = df.pipe(getcol, src, idvar, 'ploc2tel', 'tel')
 
     return df.drop_duplicates()
 
@@ -85,6 +85,12 @@ def conform_SAMHSA(source, cols, **kwargs):
                .assign(zip5=lambda df: df['Zip'].str[:5])[[idvar, 'zip5']]
                .drop_duplicates())
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
+    if 'tel' in cols:
+        src['tel'] = (source.samhsa['Phone'].str.replace('-', '')
+                                            .str.replace('(', '')
+                                            .str.replace(')', '')
+                                            .str.replace(' ', ''))
+        df = df.pipe(getcol, src, idvar, 'tel', 'tel')
     return df.drop_duplicates()
 
 
@@ -108,6 +114,7 @@ def conform_PECOS(source, cols, **kwargs):
                .assign(zip5=lambda df: df['Zip Code'].astype(str).str[:5]))
         src = src[[idvar, 'zip5']].drop_duplicates()
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
+    if 'tel' in cols:
     return df.drop_duplicates()
 
 
@@ -196,7 +203,7 @@ def main():
     npi.retrieve('secondary_practice_locations')
 
     pecos = PECOS(['NPI', 'Last Name', 'First Name', 'Middle Name',
-                   'Suffix', 'State', 'Zip Code'])
+                   'Suffix', 'State', 'Zip Code', 'Phone Number'])
     pecos.retrieve('names')
     pecos.retrieve('practitioner_type')
 
