@@ -149,7 +149,11 @@ def physician_compare_select_vars(variables,
         df.columns = [x.strip() for x in df.columns]
         full_col_ren = {**PC_COL_DICT, **{key.lower(): val
                                           for key, val in PC_COL_DICT.items()}}
-        df = df.rename(columns=full_col_ren)[['NPI'] + variables]
+        df = df.rename(columns=full_col_ren)
+        if 'Phone Number' not in variables:
+            # for some reason phone number is missing in some datasets
+            variables_use = [x for x in variables if x != 'Phone Number']
+        df = df[['NPI'] + variables_use]
         try:
             df = convert_dtypes(df, DTYPES)
         except ValueError:
@@ -159,14 +163,14 @@ def physician_compare_select_vars(variables,
             print(filename)
             try:
                 var = 'Group Practice PAC ID'
-                if var in variables:
+                if var in variables_use:
                     df[var] = df[var].apply(
                         lambda x: force_integer_blanks(x, ' '))
                     df = convert_dtypes(df, DTYPES)
             except TypeError:
                 try:
                     var = 'Number of Group Practice members'
-                    if var in variables:
+                    if var in variables_use:
                         df[var] = df[var].apply(
                             lambda x: force_integer_blanks(x, '.'))
                         df = convert_dtypes(df, DTYPES)
