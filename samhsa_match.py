@@ -137,12 +137,31 @@ def make_clean_matches_iterate(df1, idvar1, ordervar, df2, idvar2, blocklist):
             id_use=idvar1, id_target=idvar2,
             blocklist=blocklist[[x for x in blocklist.columns
                                  if x != 'order']])
-        m['order'] = o
-        blocklist = blocklist.append(m)
+        blocklist = blocklist.append(m.assign(order=o))
     return blocklist
 
 
-out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())  
+out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())
+
+priority_names = out[['samhsa_id']].assign(order=1).merge(df1)
+priority_names['new_firstname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[0])
+priority_names['new_middlename'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+priority_names['new_lastname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[-1])
+priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)  
+priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()  
+
+
+priority_names2 = out[['npi']].merge(df2)
+priority_names2['new_firstname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[0])
+priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+priority_names2['new_lastname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[-1])
+priority_names2 = priority_names2.assign(new_suffix=lambda df: df.pnamesuffix)  
+priority_names2 = priority_names2[['npi','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()   
+
+expand_matches = out[['samhsa_id','npi']].merge(priority_names).merge(out[['samhsa_id','npi']].merge(priority_names2), how='outer', indicator=True)
+all_good = expand_matches.query('_merge=="both"')[['samhsa_id','npi']].drop_duplicates()
+expand_matches = expand_matches.merge(all_good, how='left', indicator='_merge2').query('_merge2!="both"').drop(columns='_merge2')
+
 o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())            
 o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())                
 lo1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="left_only"')[['samhsa_id','npi']].drop_duplicates()
@@ -151,7 +170,7 @@ lo1.merge(ro1)
 
 
 def main():
-    # don't exploit timing here
+    # i don't exploit timing here
     s = SAMHSA()
     s.retrieve('names')
 

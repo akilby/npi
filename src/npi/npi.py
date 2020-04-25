@@ -416,11 +416,41 @@ def _normalize_entities(entities):
         raise ValueError("Value %s not a valid value for entities" % entities)
 
 
+def handle_suffixes_in_lastnames(df, lastname_col, suffix_col,
+                                 suffixes, suffixes_neverend):
+    temp_col = f'{lastname_col}_final'
+    df[temp_col] = df[lastname_col]
+
+    def handle_suffix(df, s):
+        fstrings = [f', {s}', f' {s}', f',{s}']
+        if s in suffixes_neverend:
+            fstrings = fstrings + [f'{s}']
+        for fstr in fstrings:
+            df.loc[df[lastname_col].str.endswith(fstr), suffix_col] = s
+            df = df.assign(l2=lambda x: x[lastname_col].str.split(fstr).str[0])
+            df.loc[df[lastname_col].str.endswith(fstr), temp_col] = df.l2
+        return df.drop(columns='l2')
+
+    for s in suffixes:
+        df = handle_suffix(df, s)
+
+    df[temp_col] = df[temp_col].apply(
+        lambda x: x[:-1] if x.endswith(',') else x)
+    df[temp_col] = df[temp_col].apply(
+        lambda x: x[:-2] if x.endswith(', ') else x)
+    df[temp_col] = df.plname_final.str.strip()
+    df = df.drop(columns=lastname_col).rename(columns={temp_col: lastname_col})
+    return df
+
+
 def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
-                                  suffix=None):
+                                  suffix=None,
+                                  handle_suffixes_in_lastname=False,
+                                  reconcat_names=False):
     '''
     For custom fuzzy matching
     '''
+    from .utils.globalcache import c
     # one middle initial
     df['minit'] = df[middlename].str[:1]
     # no middle name
@@ -439,6 +469,27 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
                                   .drop_duplicates()
                                   .sort_values(idvar)
                                   .reset_index(drop=True))
+
+    # dealing with suffixes in lastnames
+    suffixes = [x for x
+                in expanded_full['pnamesuffix'].value_counts().index
+                if x != '']
+    suffixes = suffixes + [' '.join(list(x)) for x in suffixes]
+    suffixes_neverend = ['JR', 'III', 'VIII']
+
+    if suffix and handle_suffixes_in_lastname:
+        df = c.handle_suffixes_in_lastnames(df, lastname, suffix,
+                                            suffixes, suffixes_neverend)
+
+    # reconcat so spacing is similar to samhsa
+    if reconcat_names:
+        n = (df.assign(
+            n=lambda x: x[firstname] + ' ' + x[middlename] + ' ' + x[lastname])
+               .n)
+        df[f'{firstname}_r'] = n.apply(lambda y: y.split()[0])
+        df[f'{middlename}_r'] = n.apply(lambda y: ' '.join(y.split()[1:-1]))
+        df[f'{lastname}_r'] = n.apply(lambda y: y.split()[-1])
+
     # turn into one name column
     expanded_full.loc[expanded_full[middlename] == '', 'name'] = (
         expanded_full[firstname] + ' ' + expanded_full[lastname])
