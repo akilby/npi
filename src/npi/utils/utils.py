@@ -97,17 +97,18 @@ def coerce_dtypes(col, orig_dtype, final_dtype):
     Converts to destination dtype and runs some sanity checks
     to make sure no harm has been done in the conversion
     '''
-    new_col = col.astype(final_dtype)
-
-    # Checks countable nulls are maintained
     try:
-        assert new_col.isna().sum() == col.isna().sum()
-    except AssertionError:
+        new_col = col.astype(final_dtype)
+    except ValueError:
         if final_dtype == 'string':
             new_col = (col.astype('str').astype('string')
                           .apply(lambda x: None if x == 'nan' else x)
                           .astype('string'))
-        assert new_col.isna().sum() == col.isna().sum()
+        else:
+            raise ValueError
+
+    # Checks countable nulls are maintained
+    assert new_col.isna().sum() == col.isna().sum()
 
     if final_dtype.lower().startswith('int'):
         # This checks numeric types are actually integers and I'm not
