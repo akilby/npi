@@ -141,6 +141,16 @@ def make_clean_matches_iterate(df1, idvar1, ordervar, df2, idvar2, blocklist):
     return blocklist
 
 
+def reconcat_names(df, firstname, middlename, lastname):
+    n = (df.assign(
+        n=lambda x: x[firstname] + ' ' + x[middlename] + ' ' + x[lastname])
+           .n)
+    df[f'{firstname}_r'] = n.apply(lambda y: y.split()[0])
+    df[f'{middlename}_r'] = n.apply(lambda y: ' '.join(y.split()[1:-1]))
+    df[f'{lastname}_r'] = n.apply(lambda y: y.split()[-1])
+    return df
+
+
 out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())
 
 priority_names = out[['samhsa_id']].assign(order=1).merge(df1)

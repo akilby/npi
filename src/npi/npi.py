@@ -304,7 +304,8 @@ class NPI(object):
                                                      'plname',
                                                      'pnamesuffix')
         self.expanded_fullnames = expand_names_in_sensible_ways(
-            f, idvar, firstname, middlename, lastname, suffix)
+            f, idvar, firstname, middlename, lastname, suffix,
+            handle_suffixes_in_lastname=True)
 
     def get_secondary_practice_locations(self):
         if hasattr(self, 'secondary_practice_locations'):
@@ -445,8 +446,7 @@ def handle_suffixes_in_lastnames(df, lastname_col, suffix_col,
 
 def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
                                   suffix=None,
-                                  handle_suffixes_in_lastname=False,
-                                  reconcat_names=False):
+                                  handle_suffixes_in_lastname=False):
     '''
     For custom fuzzy matching
     '''
@@ -480,15 +480,6 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
     if suffix and handle_suffixes_in_lastname:
         df = c.handle_suffixes_in_lastnames(df, lastname, suffix,
                                             suffixes, suffixes_neverend)
-
-    # reconcat so spacing is similar to samhsa
-    if reconcat_names:
-        n = (df.assign(
-            n=lambda x: x[firstname] + ' ' + x[middlename] + ' ' + x[lastname])
-               .n)
-        df[f'{firstname}_r'] = n.apply(lambda y: y.split()[0])
-        df[f'{middlename}_r'] = n.apply(lambda y: ' '.join(y.split()[1:-1]))
-        df[f'{lastname}_r'] = n.apply(lambda y: y.split()[-1])
 
     # turn into one name column
     expanded_full.loc[expanded_full[middlename] == '', 'name'] = (
