@@ -439,7 +439,7 @@ def handle_suffixes_in_lastnames(df, lastname_col, suffix_col,
         lambda x: x[:-1] if x.endswith(',') else x)
     df[temp_col] = df[temp_col].apply(
         lambda x: x[:-2] if x.endswith(', ') else x)
-    df[temp_col] = df.plname_final.str.strip()
+    df[temp_col] = df[temp_col].str.strip()
     df = df.drop(columns=lastname_col).rename(columns={temp_col: lastname_col})
     return df
 
@@ -472,14 +472,14 @@ def expand_names_in_sensible_ways(df, idvar, firstname, middlename, lastname,
 
     # dealing with suffixes in lastnames
     suffixes = [x for x
-                in expanded_full['pnamesuffix'].value_counts().index
+                in expanded_full[suffix].value_counts().index
                 if x != '']
     suffixes = suffixes + [' '.join(list(x)) for x in suffixes]
     suffixes_neverend = ['JR', 'III', 'VIII']
 
     if suffix and handle_suffixes_in_lastname:
-        df = c.handle_suffixes_in_lastnames(df, lastname, suffix,
-                                            suffixes, suffixes_neverend)
+        expanded_full = c.handle_suffixes_in_lastnames(
+            expanded_full, lastname, suffix, suffixes, suffixes_neverend)
 
     # turn into one name column
     expanded_full.loc[expanded_full[middlename] == '', 'name'] = (
