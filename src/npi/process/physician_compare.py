@@ -150,9 +150,11 @@ def physician_compare_select_vars(variables,
         full_col_ren = {**PC_COL_DICT, **{key.lower(): val
                                           for key, val in PC_COL_DICT.items()}}
         df = df.rename(columns=full_col_ren)
-        if 'Phone Number' not in variables:
+        if 'Phone Number' in variables and 'Phone Number' not in df.columns:
             # for some reason phone number is missing in some datasets
             variables_use = [x for x in variables if x != 'Phone Number']
+        else:
+            variables_use = variables
         df = df[['NPI'] + variables_use]
         try:
             df = convert_dtypes(df, DTYPES)
