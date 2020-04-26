@@ -79,7 +79,10 @@ class ReadPhysicianCompare(object):
         df = pd.read_csv(filename,  engine="python", sep=',',
                          quotechar='"', error_bad_lines=False,
                          header=None)
-        df.columns = PC_COLNAMES
+        try:
+            df.columns = PC_COLNAMES
+        except ValueError:
+            df.columns = [x for x in PC_COLNAMES if x != "Phone Number"]
         df['Graduation year'] = df['Graduation year'].apply(
             lambda x: force_integer(x)).astype('Int64')
         return df
@@ -89,7 +92,10 @@ class ReadPhysicianCompare(object):
         df = pd.read_csv(filename,  engine="python", sep=',',
                          quotechar='"', error_bad_lines=False,
                          header=None)
-        df.columns = PC_COLNAMES
+        try:
+            df.columns = PC_COLNAMES
+        except ValueError:
+            df.columns = [x for x in PC_COLNAMES if x != "Phone Number"]
         df = df.drop(0).reset_index(drop=True)
         df['Graduation year'] = df['Graduation year'].apply(
             lambda x: force_integer(x)).astype('Int64')

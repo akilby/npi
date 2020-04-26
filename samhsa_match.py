@@ -167,7 +167,7 @@ priority_names['new_lastname'] = priority_names.assign(n=lambda df: df['firstnam
 priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)  
 priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()  
 
-
+# USE RECONCAT NAMES
 priority_names2 = out[['npi']].merge(df2)
 priority_names2['new_firstname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[0])
 priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
@@ -187,7 +187,7 @@ lo1.merge(ro1)
 
 
 def main():
-    # i don't exploit timing here
+    # I don't exploit timing here
     s = SAMHSA()
     s.retrieve('names')
 
