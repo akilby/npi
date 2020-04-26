@@ -54,7 +54,8 @@ class PECOS(object):
                          firstname='First Name',
                          middlename='Middle Name',
                          lastname='Last Name',
-                         suffix='Suffix'))
+                         suffix='Suffix',
+                         handle_suffixes_in_lastname=True))
         self.names = names
 
     def get_practitioner_type(self):
