@@ -115,6 +115,10 @@ def conform_PECOS(source, cols, **kwargs):
         src = src[[idvar, 'zip5']].drop_duplicates()
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
     if 'tel' in cols:
+        src = (source.physician_compare['Phone Number']
+                     .astype('string')
+                     .apply(lambda x: str(x).replace('.0', '')))
+        df = df.pipe(getcol, pd.DataFrame(src), idvar, 'Phone Number', 'tel')
     return df.drop_duplicates()
 
 
