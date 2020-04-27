@@ -66,8 +66,14 @@ def conform_NPI(source, cols, **kwargs):
             src = (source
                    .secondary_practice_locations[[idvar, 'ploc2tel']]
                    .drop_duplicates())
-            df = df.pipe(getcol, src, idvar, 'ploc2tel', 'tel')
-
+            src['tel'] = (src.ploc2tel
+                             .astype('str')
+                             .str.split('.', expand=True)[0])
+            src['tel'] = (src.tel.str.replace('-', '')
+                                     .str.replace('(', '')
+                                     .str.replace(')', '')
+                                     .str.replace(' ', ''))
+            df = df.pipe(getcol, src, idvar, 'tel', 'tel')
     return df.drop_duplicates()
 
 
@@ -86,11 +92,14 @@ def conform_SAMHSA(source, cols, **kwargs):
                .drop_duplicates())
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
     if 'tel' in cols:
-        src['tel'] = (source.samhsa['Phone'].str.replace('-', '')
-                                            .str.replace('(', '')
-                                            .str.replace(')', '')
-                                            .str.replace(' ', ''))
-        df = df.pipe(getcol, src, idvar, 'tel', 'tel')
+        src = source.samhsa['samhsa_id']
+        src2 = (pd.DataFrame(source.samhsa['Phone']
+                                   .str.replace('-', '')
+                                   .str.replace('(', '')
+                                   .str.replace(')', '')
+                                   .str.replace(' ', '')))
+        src = pd.concat([src, src2], axis=1)
+        df = df.pipe(getcol, src, idvar, 'Phone', 'tel')
     return df.drop_duplicates()
 
 
@@ -115,9 +124,11 @@ def conform_PECOS(source, cols, **kwargs):
         src = src[[idvar, 'zip5']].drop_duplicates()
         df = df.pipe(getcol, src, idvar, 'zip5', 'zip5')
     if 'tel' in cols:
-        src = (source.physician_compare['Phone Number']
-                     .astype('string')
-                     .apply(lambda x: str(x).replace('.0', '')))
+        src = source.physician_compare['NPI']
+        src2 = (source.physician_compare['Phone Number']
+                      .astype('string')
+                      .apply(lambda x: str(x).replace('.0', '')))
+        src = pd.concat([src, src2], axis=1)
         df = df.pipe(getcol, pd.DataFrame(src), idvar, 'Phone Number', 'tel')
     return df.drop_duplicates()
 
@@ -162,32 +173,54 @@ def reconcat_names(df, firstname, middlename, lastname):
     return df
 
 
-out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())
+def generate_matches(s, npi, pecos, varlist, practypes, final_crosswalk):
+    df1 = conform_data_sources(s, varlist)
+    df2 = conform_data_sources(npi, varlist, practypes=practypes)
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi',
+                                                 final_crosswalk)
+    print('(1) Found %s matches' % final_crosswalk.shape[0])
+    df3 = conform_data_sources(pecos, varlist, practypes=practypes)
+    df3 = df3.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df3, 'npi',
+                                                 final_crosswalk)
+    print('(2) Found %s matches' % final_crosswalk.shape[0])
+    df4 = conform_data_sources(npi, varlist,
+                               practypes=practypes, npi_source="ploc2")
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df4, 'npi',
+                                                 final_crosswalk)
+    print('(3) Found %s matches' % final_crosswalk.shape[0])
+    return final_crosswalk
 
-priority_names = out[['samhsa_id']].assign(order=1).merge(df1)
-priority_names['new_firstname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[0])
-priority_names['new_middlename'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
-priority_names['new_lastname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[-1])
-priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)  
-priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()  
 
-# USE RECONCAT NAMES
-priority_names2 = out[['npi']].merge(df2)
-priority_names2['new_firstname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[0])
-priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
-priority_names2['new_lastname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[-1])
-priority_names2 = priority_names2.assign(new_suffix=lambda df: df.pnamesuffix)  
-priority_names2 = priority_names2[['npi','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()   
-
-expand_matches = out[['samhsa_id','npi']].merge(priority_names).merge(out[['samhsa_id','npi']].merge(priority_names2), how='outer', indicator=True)
-all_good = expand_matches.query('_merge=="both"')[['samhsa_id','npi']].drop_duplicates()
-expand_matches = expand_matches.merge(all_good, how='left', indicator='_merge2').query('_merge2!="both"').drop(columns='_merge2')
-
-o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())            
-o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())                
-lo1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="left_only"')[['samhsa_id','npi']].drop_duplicates()
-ro1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="right_only"')[['samhsa_id','npi']].drop_duplicates()
-lo1.merge(ro1)
+# out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())
+# 
+# priority_names = out[['samhsa_id']].assign(order=1).merge(df1)
+# priority_names['new_firstname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[0])
+# priority_names['new_middlename'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+# priority_names['new_lastname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[-1])
+# priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)  
+# priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()  
+# 
+# # USE RECONCAT NAMES
+# priority_names2 = out[['npi']].merge(df2)
+# priority_names2['new_firstname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[0])
+# priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+# priority_names2['new_lastname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[-1])
+# priority_names2 = priority_names2.assign(new_suffix=lambda df: df.pnamesuffix)  
+# priority_names2 = priority_names2[['npi','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()   
+# 
+# expand_matches = out[['samhsa_id','npi']].merge(priority_names).merge(out[['samhsa_id','npi']].merge(priority_names2), how='outer', indicator=True)
+# all_good = expand_matches.query('_merge=="both"')[['samhsa_id','npi']].drop_duplicates()
+# expand_matches = expand_matches.merge(all_good, how='left', indicator='_merge2').query('_merge2!="both"').drop(columns='_merge2')
+# 
+# o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())            
+# o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())                
+# lo1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="left_only"')[['samhsa_id','npi']].drop_duplicates()
+# ro1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="right_only"')[['samhsa_id','npi']].drop_duplicates()
+# lo1.merge(ro1)
 
 
 def main():
@@ -216,7 +249,75 @@ def main():
 
     practypes = ['MD/DO', 'NP', 'PA', 'CRNA', 'CNM', 'CNS']
 
-    # 0. ADD TELEPHONE
+    # 0. TELEPHONE
+
+    final_crosswalk = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type', 'state', 'zip5', 'tel'],
+        practypes, final_crosswalk)
+
+    final_crosswalk = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type', 'state', 'tel'],
+        practypes, final_crosswalk)
+
+    final_crosswalk = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type', 'state', 'zip5'],
+        practypes, final_crosswalk)
+
+    final_crosswalk = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type', 'state'],
+        practypes, final_crosswalk)
+
+    # remove conflicts from order 1
+    # use reconcat
+    final_crosswalk1 = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type'],
+        practypes, final_crosswalk)
+
+    final_crosswalk2 = generate_matches(
+        s, npi, pecos,
+        ['state', 'zip5', 'tel'],
+        practypes, final_crosswalk)
+
+    final_crosswalk3 = generate_matches(
+        s, npi, pecos,
+        ['state', 'tel'],
+        practypes, final_crosswalk)
+
+    final_crosswalk4 = generate_matches(
+        s, npi, pecos,
+        ['state', 'zip5'],
+        practypes, final_crosswalk)
+
+    final_crosswalk5 = generate_matches(
+        s, npi, pecos,
+        ['state'],
+        practypes, final_crosswalk)
+
+    final_crosswalk6 = generate_matches(
+        s, npi, pecos,
+        [],
+        practypes, final_crosswalk)
+
+    df1 = conform_data_sources(
+        s, ['practitioner_type', 'state', 'zip5', 'tel'])
+    df2 = conform_data_sources(
+        npi, ['practitioner_type', 'state', 'zip5', 'tel'],
+        practypes=practypes)
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+    df3 = conform_data_sources(pecos,
+                               ['practitioner_type', 'state', 'zip5', 'tel'],
+                               practypes=practypes)
+    df3 = df3.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df3, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
 
     # 1. exact match on name, practitioner type, state, and zip code
     df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
@@ -224,6 +325,12 @@ def main():
                                practypes=practypes)
     final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
                                                  df2, 'npi', final_crosswalk)
+    print('Found %s matches' % final_crosswalk.shape[0])
+    df3 = conform_data_sources(pecos, ['practitioner_type', 'state', 'zip5'],
+                               practypes=practypes)
+    df3 = df3.rename(columns={'NPI': 'npi'})
+    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                 df3, 'npi', final_crosswalk)
     print('Found %s matches' % final_crosswalk.shape[0])
 
     # 2. exact match on name, practitioner type, and state
