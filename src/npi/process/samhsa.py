@@ -1,4 +1,5 @@
 import pandas as pd
+from cache.utils.utils import pickle_dump, pickle_read
 from npi.npi import NPI, convert_practitioner_data_to_long
 from npi.pecos import PECOS
 from npi.samhsa import SAMHSA
@@ -174,23 +175,24 @@ def reconcat_names(df, firstname, middlename, lastname):
 
 
 def generate_matches(s, npi, pecos, varlist, practypes, final_crosswalk):
+    from .utils.globalcache import c
     df1 = conform_data_sources(s, varlist)
     df2 = conform_data_sources(npi, varlist, practypes=practypes)
-    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
-                                                 df2, 'npi',
-                                                 final_crosswalk)
+    final_crosswalk = c.make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                   df2, 'npi',
+                                                   final_crosswalk)
     print('(1) Found %s matches' % final_crosswalk.shape[0])
     df3 = conform_data_sources(pecos, varlist, practypes=practypes)
     df3 = df3.rename(columns={'NPI': 'npi'})
-    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
-                                                 df3, 'npi',
-                                                 final_crosswalk)
+    final_crosswalk = c.make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                   df3, 'npi',
+                                                   final_crosswalk)
     print('(2) Found %s matches' % final_crosswalk.shape[0])
     df4 = conform_data_sources(npi, varlist,
                                practypes=practypes, npi_source="ploc2")
-    final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
-                                                 df4, 'npi',
-                                                 final_crosswalk)
+    final_crosswalk = c.make_clean_matches_iterate(df1, 'samhsa_id', 'order',
+                                                   df4, 'npi',
+                                                   final_crosswalk)
     print('(3) Found %s matches' % final_crosswalk.shape[0])
     return final_crosswalk
 
@@ -255,21 +257,25 @@ def main():
         s, npi, pecos,
         ['practitioner_type', 'state', 'zip5', 'tel'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk, 'p1.pkl')
 
     final_crosswalk = generate_matches(
         s, npi, pecos,
         ['practitioner_type', 'state', 'tel'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk, 'p2.pkl')
 
     final_crosswalk = generate_matches(
         s, npi, pecos,
         ['practitioner_type', 'state', 'zip5'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk, 'p3.pkl')
 
     final_crosswalk = generate_matches(
         s, npi, pecos,
         ['practitioner_type', 'state'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk, 'p4.pkl')
 
     # remove conflicts from order 1
     # use reconcat
@@ -277,31 +283,37 @@ def main():
         s, npi, pecos,
         ['practitioner_type'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk1, 'p5.pkl')
 
     final_crosswalk2 = generate_matches(
         s, npi, pecos,
         ['state', 'zip5', 'tel'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk2, 'p6.pkl')
 
     final_crosswalk3 = generate_matches(
         s, npi, pecos,
         ['state', 'tel'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk3, 'p7.pkl')
 
     final_crosswalk4 = generate_matches(
         s, npi, pecos,
         ['state', 'zip5'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk4, 'p8.pkl')
 
     final_crosswalk5 = generate_matches(
         s, npi, pecos,
         ['state'],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk5, 'p9.pkl')
 
     final_crosswalk6 = generate_matches(
         s, npi, pecos,
         [],
         practypes, final_crosswalk)
+    pickle_dump(final_crosswalk6, 'p10.pkl')
 
     df1 = conform_data_sources(
         s, ['practitioner_type', 'state', 'zip5', 'tel'])
