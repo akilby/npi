@@ -272,39 +272,106 @@ def match_samhsa_npi():
         ['practitioner_type', 'state'],
         practypes, final_crosswalk)
 
-
-    final_crosswalk2 = generate_matches(
+    final_crosswalk = generate_matches(
         s, npi, pecos,
         ['state', 'zip5', 'tel'],
         practypes, final_crosswalk)
-    # maybe only keep for early orders
-
-    # *** remove conflicts from order 1 using reconcat here
 
     final_crosswalk1 = generate_matches(
-        s, npi, pecos,
-        ['practitioner_type'],
-        practypes, final_crosswalk)
-
-    final_crosswalk3 = generate_matches(
         s, npi, pecos,
         ['state', 'tel'],
         practypes, final_crosswalk)
 
-    final_crosswalk4 = generate_matches(
+    final_crosswalk2 = generate_matches(
         s, npi, pecos,
         ['state', 'zip5'],
         practypes, final_crosswalk)
 
-    final_crosswalk5 = generate_matches(
+    final_crosswalk3 = generate_matches(
         s, npi, pecos,
         ['state'],
         practypes, final_crosswalk)
 
-    final_crosswalk6 = generate_matches(
+    final_crosswalk4 = generate_matches(
+        s, npi, pecos,
+        ['practitioner_type'],
+        practypes, final_crosswalk)
+
+    final_crosswalk5 = generate_matches(
         s, npi, pecos,
         [],
         practypes, final_crosswalk)
+
+    fin = (final_crosswalk1.merge(final_crosswalk, how='left', indicator=True)
+                           .query('_merge=="left_only"'))
+    fin = (fin.append(
+        final_crosswalk2
+        .merge(final_crosswalk, how='left', indicator=True)
+        .query('_merge=="left_only"')))
+    fin = fin.append(
+        final_crosswalk3.query('order==1')
+        .merge(s.names).query('middlename!=""')[['samhsa_id', 'npi']]
+        .drop_duplicates()
+        .merge(final_crosswalk, how='left', indicator=True)
+        .query('_merge=="left_only"'))
+    fin = fin.append(
+        final_crosswalk4.query('order==1')
+        .merge(s.names).query('middlename!=""')[['samhsa_id', 'npi']]
+        .drop_duplicates()
+        .merge(final_crosswalk, how='left', indicator=True)
+        .query('_merge=="left_only"'))
+    fin = fin.append(
+        final_crosswalk5.query('order==1')
+        .merge(s.names).query('middlename!=""')[['samhsa_id', 'npi']]
+        .drop_duplicates()
+        .merge(final_crosswalk, how='left', indicator=True)
+        .query('_merge=="left_only"'))
+    fin = fin[['samhsa_id', 'npi']].drop_duplicates()
+
+    fin = fin[~fin['samhsa_id'].duplicated(keep=False)]
+    fin = fin[~fin['npi'].duplicated(keep=False)]
+    fin = final_crosswalk.append(fin).drop(columns='order').drop_duplicates()
+    fin = fin.append(pd.DataFrame(dict(samhsa_id=[42325, 34010, 80, 62, 42387,
+                                                  42333, 42339],
+                                       npi=[1558332031, 1154652295,
+                                            1871718890, 1275599524, 1457360588,
+                                            1609002799, 1346518842]
+                                       )))
+
+    nopunct1 = (npi
+                .expanded_fullnames
+                .assign(nopunct=npi.expanded_fullnames['name']
+                                   .str.replace("'", "")
+                                   .str.replace('-', '')
+                                   .str.replace(' ', ''))[['npi', 'nopunct']])
+    remainders = (fin.merge(s.samhsa.drop_duplicates(),
+                            how='right', on='samhsa_id', indicator=True)
+                     .query('_merge=="right_only"'))
+    nopunct2 = (remainders[['samhsa_id']]
+                .merge(s.names)
+                .assign(nopunct=lambda df: (df['name']
+                                            .str.replace("'", "")
+                                            .str.replace('-', '')
+                                            .str.replace(' ', ''))))
+    nopunct2 = nopunct2[['samhsa_id', 'nopunct']]
+    matches = nopunct2.merge(nopunct1)
+    matches2 = matches[['npi', 'samhsa_id']].drop_duplicates()
+    matches2 = matches2[~matches2['samhsa_id'].duplicated(keep=False)]
+    matches2 = matches2[~matches2['npi'].duplicated(keep=False)]
+    newmatches = (matches2.merge(nopunct1)
+                          .merge(nopunct2)[
+                          matches2.merge(nopunct1)
+                          .merge(nopunct2)
+                          .nopunct.str.len() >= 10][['npi', 'samhsa_id']]
+                  .drop_duplicates())
+    newmatches = newmatches[~newmatches.samhsa_id.isin(fin.samhsa_id)]
+    newmatches = newmatches[~newmatches.npi.isin(fin.npi)]
+    fin = fin.append(newmatches)
+
+    assert fin['samhsa_id'].is_unique
+    assert fin['npi'].is_unique
+    fin.reset_index(inplace=True, drop=True)
+    return fin
 
 
 def analysis_dataset():
@@ -938,3 +1005,27 @@ def analysis_dataset():
 #                                                                                      has_100=lambda df: 1*((df.Date100.notnull()) & (df.date>=pd.to_datetime(df.Date100))),
 #                                                                                      has_275=lambda df: 1*((df.Date275.notnull()) & (df.date>=pd.to_datetime(df.Date275)))) 
 # 
+
+    # samhsa_match_names = final_crosswalk.drop(columns='order').merge(s.names).query('order==1')
+    # samhsa_middle_init = samhsa_match_names[samhsa_match_names.middlename.str.len() == 1]
+    # samhsa_middle_name = samhsa_match_names[samhsa_match_names.middlename.str.len() > 1]
+    # samhsa_no_middle_init = samhsa_match_names[samhsa_match_names.middlename.str.len() == 0]
+# 
+    # npi_match_names = final_crosswalk.drop(columns='order').merge(npi.expanded_fullnames).pipe(reconcat_names, 'pfname', 'pmname', 'plname')
+    # npi_middle_init = npi_match_names[npi_match_names.pmname_r.str.len() == 1]
+    # npi_middle_name = npi_match_names[npi_match_names.pmname_r.str.len() > 1]
+# 
+    # pnr = pecos.names.rename(columns={'NPI': 'npi', 'First Name': 'FirstName', 'Middle Name': 'MiddleName', 'Last Name': 'LastName'})
+    # pecos_match_names = final_crosswalk.drop(columns='order').merge(pnr).pipe(reconcat_names, 'FirstName', 'MiddleName', 'LastName')
+    # pecos_middle_init = pecos_match_names[pecos_match_names['MiddleName_r'].str.len() == 1]
+    # pecos_middle_name = pecos_match_names[pecos_match_names['MiddleName_r'].str.len() > 1]
+# 
+    # m1 = samhsa_middle_init.merge(npi_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and pmname_r==middlename')[['samhsa_id','npi']].drop_duplicates()
+    # m2 = samhsa_middle_init.merge(pecos_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and MiddleName_r==middlename')[['samhsa_id','npi']].drop_duplicates()
+# 
+    # nom1 = samhsa_middle_init.merge(npi_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and pmname_r!=middlename')[['samhsa_id','npi']].drop_duplicates()
+    # nom2 = samhsa_middle_init.merge(pecos_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and MiddleName_r!=middlename')[['samhsa_id','npi']].drop_duplicates()
+
+    # maybe only keep for early orders
+
+    # *** remove conflicts from order 1 using reconcat here -- or maybe not
