@@ -37,8 +37,8 @@ class NPI(object):
         fc = [x.replace('get_', '') for x in dir(self) if x.startswith('get_')]
         raw = [x for x in fc if x in USE_VAR_LIST_DICT.keys()]
         proc = [x for x in fc if x not in USE_VAR_LIST_DICT.keys()]
-        print('Gettable raw data:', raw)
-        print('Gettable processed data:', proc)
+        print('Gettable raw data:\n', raw, '\n\n')
+        print('Gettable processed data:\n', proc)
 
     def get_entity(self):
         if hasattr(self, 'entity'):
