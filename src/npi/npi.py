@@ -32,6 +32,10 @@ class NPI(object):
         for f in fc:
             self.retrieve(f)
 
+    def display_gettable_attributes(self):
+        fc = [x.replace('get_', '') for x in dir(self) if x.startswith('get_')]
+        print(fc)
+
     def get_entity(self):
         if hasattr(self, 'entity'):
             return
