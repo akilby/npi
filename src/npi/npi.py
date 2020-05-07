@@ -11,6 +11,7 @@ import re
 from functools import reduce
 
 import pandas as pd
+from npi.constants import USE_VAR_LIST_DICT
 # from download.medical_schools import sanitize_web_medical_schools
 from utility_data.taxonomies import provider_taxonomies
 
@@ -34,7 +35,10 @@ class NPI(object):
 
     def display_gettable_attributes(self):
         fc = [x.replace('get_', '') for x in dir(self) if x.startswith('get_')]
-        print(fc)
+        raw = [x for x in fc if x in USE_VAR_LIST_DICT.keys()]
+        proc = [x for x in fc if x not in USE_VAR_LIST_DICT.keys()]
+        print('Gettable raw data:', raw)
+        print('Gettable processed data:', proc)
 
     def get_entity(self):
         if hasattr(self, 'entity'):
