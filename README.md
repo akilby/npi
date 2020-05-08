@@ -10,3 +10,9 @@ This downloads NPI/NPPES data from two sources: CMS and the NBER. NBER data is d
 ```bash
 python -m npi.download.nppes
 ```
+
+### Using the package as an API
+
+See an example notebook here:
+
+[NPI Database Query Example](https://github.com/akilby/npi/blob/master/NPI%20Database%20Query%20Example.ipynb)
