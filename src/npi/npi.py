@@ -104,6 +104,13 @@ class NPI(object):
         name['pnamesuffix'] = name.pnamesuffix.str.replace('.', '')
         self.pnamesuffix = name
 
+    def get_pgender(self):
+        if hasattr(self, 'pgender') or self.entities in [2, [2]]:
+            return
+        from .utils.globalcache import c
+        self.pgender = c.get_name(
+            self.src, self.npis, self.entity, 'pgender')
+
     def get_pfnameoth(self):
         if hasattr(self, 'pfnameoth') or self.entities in [2, [2]]:
             return

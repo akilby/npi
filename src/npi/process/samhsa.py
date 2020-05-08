@@ -375,6 +375,12 @@ def match_samhsa_npi():
 
 
 def analysis_dataset():
+    # Get matches of NPI to SAMHSA
+    matches = (pd.read_csv('/work/akilby/npi/final_matches.csv')
+                 .drop(columns='Unnamed: 0'))
+    # from npi.utils.globalcache import c
+    # matches = c.match_samhsa_npi()
+    
     s = SAMHSA()
     npi = NPI(entities=1)
     npi.retrieve('practitioner_type')
@@ -382,17 +388,25 @@ def analysis_dataset():
                        .pipe(convert_practitioner_data_to_long,
                              types=['MD/DO', 'NP', 'PA',
                                     'CRNA', 'CNM', 'CNS']))
+    npi.retrieve('pgender')
     pecos = PECOS(['NPI', 'Last Name', 'First Name', 'Middle Name',
                    'Suffix', 'State', 'Zip Code', 'Phone Number'])
     pecos.retrieve('practitioner_type')
 
     # 1. Select MD/DO from either NPI or PECOS (plus Samhsa?)
-    mddo = (pecos
-            .practitioner_type
-            .merge(npi_practype, how='left', left_on="NPI", right_on='npi')
+    practitioners = (pecos.practitioner_type.merge(npi_practype,
+                                                   how='left',
+                                                   left_on="NPI",
+                                                   right_on='npi'))
+    mddo = (practitioners
             .query('Credential=="MD/DO" or Credential=="MD" or Credential=="DO'
                    '" or PractitionerType=="MD/DO"')
             .NPI.drop_duplicates())
+    nps = practitioners.loc[(practitioners['Primary specialty']
+                             == "NURSE PRACTITIONER")
+                            | (practitioners['Credential'] == 'NP')
+                            | (practitioners['PractitionerType'] == "NP")]
+    nps = nps.NPI.drop_duplicates()
 
     pecos_groups = PECOS(['NPI', 'Organization legal name',
                           'Group Practice PAC ID',
@@ -408,12 +422,45 @@ def analysis_dataset():
                           'Hospital affiliation CCN 5',
                           'Hospital affiliation LBN 5'],
                          drop_duplicates=False, date_var=True)
+
+    pecos_groups_loc = PECOS(['NPI', 'Organization legal name',
+                              'Group Practice PAC ID',
+                              'Number of Group Practice members',
+                              'State', 'Zip Code', 'Phone Number'],
+                             drop_duplicates=False, date_var=True)
+
+    pecos_groups_loc.physician_compare = (pecos_groups_loc
+                                          .physician_compare
+                                          .drop_duplicates())
+
+    coprac = (pecos_groups_loc
+              .physician_compare[['Group Practice PAC ID', 'Zip Code', 'date']]
+              .drop_duplicates()
+              .dropna())
+    coprac_ids = coprac.reset_index(drop=True).reset_index().rename(
+        columns={'index': 'group_prac_zip_date_id'})
+    coprac_np_counts = (pecos_groups_loc
+                        .physician_compare
+                        .merge(nps)
+                        .merge(coprac_ids)
+                        .groupby(['group_prac_zip_date_id', 'date'])
+                        .size()
+                        .reset_index()
+                        .rename(columns={0: 'np_count'}))
+    coprac_mds = (pecos_groups_loc
+                  .physician_compare
+                  .merge(mddo)
+                  .merge(coprac_ids))
+    coprac_mds = coprac_mds.merge(coprac_np_counts, how='left')
+    coprac_mds['np_count'] = coprac_mds.np_count.fillna(0)
     # Specialties. time varying?
     pecos_specs = PECOS(['NPI', 'Primary specialty',
                          'Secondary specialty 1',
                          'Secondary specialty 2',
                          'Secondary specialty 3',
                          'Secondary specialty 4'])
+
+    pecos_education = PECOS(['NPI', 'Medical school name', 'Graduation year'])
 
     mddo = pecos_specs.physician_compare.merge(mddo)
     prim_spec = pd.concat([mddo['NPI'],
@@ -436,6 +483,9 @@ def analysis_dataset():
                           sec_spec['secondary_spec'])],
                          axis=1).groupby('NPI').sum()
     sec_spec = 1*(sec_spec > 0)
+
+
+
     # df1 = conform_data_sources(
     #     s, ['practitioner_type', 'state', 'zip5', 'tel'])
     # df2 = conform_data_sources(
