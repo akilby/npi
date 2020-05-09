@@ -108,8 +108,7 @@ class NPI(object):
         if hasattr(self, 'pgender') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
-        self.pgender = c.get_gender(
-            self.src, self.npis, self.entity, 'pgender')
+        self.pgender = c.get_gender(self.src, self.npis, self.entity)
 
     def get_pfnameoth(self):
         if hasattr(self, 'pfnameoth') or self.entities in [2, [2]]:
