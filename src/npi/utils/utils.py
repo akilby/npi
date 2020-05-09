@@ -1,4 +1,5 @@
 import calendar
+import datetime
 import glob
 import os
 import urllib
@@ -181,3 +182,91 @@ def col_reorderer(df_cols, cols, how='first'):
         return cols + othercols
     else:
         return othercols + cols
+
+
+def stata_elapsed_date_to_datetime(date, fmt):
+    """
+    Original source for this code:
+    https://www.statsmodels.org/0.8.0/_modules/statsmodels/iolib/foreign.html
+
+    Convert from SIF to datetime. http://www.stata.com/help.cgi?datetime
+
+    Parameters
+    ----------
+    date : int
+        The Stata Internal Format date to convert to datetime according to fmt
+    fmt : str
+        The format to convert to. Can be, tc, td, tw, tm, tq, th, ty
+
+    Examples
+    --------
+    >>> _stata_elapsed_date_to_datetime(52, "%tw")
+    datetime.datetime(1961, 1, 1, 0, 0)
+
+    Notes
+    -----
+    datetime/c - tc
+        milliseconds since 01jan1960 00:00:00.000, assuming 86,400 s/day
+    datetime/C - tC - NOT IMPLEMENTED
+        milliseconds since 01jan1960 00:00:00.000, adjusted for leap seconds
+    date - td
+        days since 01jan1960 (01jan1960 = 0)
+    weekly date - tw
+        weeks since 1960w1
+        This assumes 52 weeks in a year, then adds 7 * remainder of the weeks.
+        The datetime value is the start of the week in terms of days in the
+        year, not ISO calendar weeks.
+    monthly date - tm
+        months since 1960m1
+    quarterly date - tq
+        quarters since 1960q1
+    half-yearly date - th
+        half-years since 1960h1 yearly
+    date - ty
+        years since 0000
+
+    If you don't have pandas with datetime support, then you can't do
+    milliseconds accurately.
+    """
+    # NOTE: we could run into overflow / loss of precision situations here
+    # casting to int, but I'm not sure what to do. datetime won't deal with
+    # numpy types and numpy datetime isn't mature enough / we can't rely on
+    # pandas version > 0.7.1
+    # TODO: IIRC relative delta doesn't play well with np.datetime?
+    date = int(date)
+    stata_epoch = datetime.datetime(1960, 1, 1)
+    if fmt in ["%tc", "tc"]:
+        from dateutil.relativedelta import relativedelta
+        return stata_epoch + relativedelta(microseconds=date*1000)
+    elif fmt in ["%tC", "tC"]:
+        from warnings import warn
+        warn("Encountered %tC format. Leaving in Stata Internal Format.",
+             UserWarning)
+        return date
+    elif fmt in ["%td", "td"]:
+        return stata_epoch + datetime.timedelta(int(date))
+    elif fmt in ["%tw", "tw"]:
+        # does not count leap days - 7 days is a week
+        year = datetime.datetime(stata_epoch.year + date // 52, 1, 1)
+        day_delta = (date % 52) * 7
+        return year + datetime.timedelta(int(day_delta))
+    elif fmt in ["%tm", "tm"]:
+        year = stata_epoch.year + date // 12
+        month_delta = (date % 12) + 1
+        return datetime.datetime(year, month_delta, 1)
+    elif fmt in ["%tq", "tq"]:
+        year = stata_epoch.year + date // 4
+        month_delta = (date % 4) * 3 + 1
+        return datetime.datetime(year, month_delta, 1)
+    elif fmt in ["%th", "th"]:
+        year = stata_epoch.year + date // 2
+        month_delta = (date % 2) * 6 + 1
+        return datetime.datetime(year, month_delta, 1)
+    elif fmt in ["%ty", "ty"]:
+        if date > 0:
+            return datetime.datetime(date, 1, 1)
+        else:
+            # don't do negative years bc can't mix dtypes in column
+            raise ValueError("Year 0 and before not implemented")
+    else:
+        raise ValueError("Date fmt %s not understood" % fmt)

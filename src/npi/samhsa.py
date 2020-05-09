@@ -3,6 +3,7 @@ import re
 
 import numpy as np
 import pandas as pd
+from npi.utils.utils import stata_elapsed_date_to_datetime
 
 from .npi import expand_names_in_sensible_ways
 
@@ -13,7 +14,15 @@ source_file = ('/work/akilby/npi/samhsa_processing/'
 class SAMHSA(object):
     def __init__(self, src=source_file):
         self.source_file = src
-        self.samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
+        samhsa = self.make_samhsa_id(pd.read_csv(src, low_memory=False))
+        samhsa['Date'] = samhsa.Date.apply(
+            lambda x: stata_elapsed_date_to_datetime(x, 'td'))
+        assert all(samhsa.apply(lambda x: x['Date']
+                   == pd.to_datetime(x['DateGranted']), axis=1)
+                   ^ samhsa.apply(
+                    lambda x: pd.to_datetime(x['DateLastCertified'])
+                    == x['Date'] and np.isnan(x['DateGranted']), axis=1))
+        self.samhsa = samhsa
         self.get_names()
 
     def retrieve(self, thing):
@@ -24,7 +33,7 @@ class SAMHSA(object):
         """
         SAMHSA files do not have an identifier. Make an arbitrary one for
         tracking throughout the class. Note: this will not be stable across
-        different versions of the SAMHSA data
+        different versions of the SAMHSA data. Should do a hash or something
         """
         for idvar in idvars:
             samhsa[idvar] = samhsa[idvar].str.upper()

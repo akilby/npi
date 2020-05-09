@@ -1,7 +1,9 @@
 import pandas as pd
+from cache.utils.utils import pickle_read
 from npi.npi import NPI, convert_practitioner_data_to_long
 from npi.pecos import PECOS
 from npi.samhsa import SAMHSA
+from npi.utils.utils import stata_elapsed_date_to_datetime
 
 
 def getcol(df, src, idvar, col, newname):
@@ -376,12 +378,13 @@ def match_samhsa_npi():
 
 def analysis_dataset():
     # Get matches of NPI to SAMHSA
-    matches = (pd.read_csv('/work/akilby/npi/final_matches.csv')
-                 .drop(columns='Unnamed: 0'))
+    # matches = (pd.read_csv('/work/akilby/npi/final_matches.csv')
+    #              .drop(columns='Unnamed: 0'))
+    matches = pickle_read(
+        '/work/akilby/npi/Cache/Caches/output_1588990540883395.pkl')
     # from npi.utils.globalcache import c
     # matches = c.match_samhsa_npi()
-    
-    s = SAMHSA()
+
     npi = NPI(entities=1)
     npi.retrieve('practitioner_type')
     npi_practype = (npi.practitioner_type
@@ -442,7 +445,10 @@ def analysis_dataset():
     coprac_np_counts = (pecos_groups_loc
                         .physician_compare
                         .merge(nps)
-                        .merge(coprac_ids)
+                        .merge(coprac_ids))
+    idvars = ['group_prac_zip_date_id', 'date', 'NPI']
+    coprac_np_counts = coprac_np_counts[idvars].drop_duplicates()
+    coprac_np_counts = (coprac_np_counts
                         .groupby(['group_prac_zip_date_id', 'date'])
                         .size()
                         .reset_index()
@@ -451,8 +457,17 @@ def analysis_dataset():
                   .physician_compare
                   .merge(mddo)
                   .merge(coprac_ids))
+    coprac_mds = coprac_mds[idvars].drop_duplicates()
     coprac_mds = coprac_mds.merge(coprac_np_counts, how='left')
     coprac_mds['np_count'] = coprac_mds.np_count.fillna(0)
+    mins = (coprac_mds
+            .drop(columns='group_prac_zip_date_id')
+            .groupby(['NPI', 'date'], as_index=False).min())
+    maxes = (coprac_mds.drop(columns='group_prac_zip_date_id')
+                       .groupby(['NPI', 'date'], as_index=False).max())
+    copracs = mins.merge(maxes.rename(columns={'np_count': 'np_count_max'}))
+    assert (copracs[['NPI', 'date']].drop_duplicates().shape[0]
+            == copracs.shape[0])
     # Specialties. time varying?
     pecos_specs = PECOS(['NPI', 'Primary specialty',
                          'Secondary specialty 1',
@@ -484,8 +499,29 @@ def analysis_dataset():
                          axis=1).groupby('NPI').sum()
     sec_spec = 1*(sec_spec > 0)
 
+    copracs = copracs.merge(prim_spec.reset_index())
+    copracs = copracs.merge(sec_spec, how='left')
+    # copracs.merge(sec_spec.reset_index(), how='left')
+    copracs = copracs.merge(pecos_education.physician_compare[['NPI', 'Graduation year']].groupby('NPI', as_index=False).first())
+    pd.cut(copracs['Graduation year'], 20)
+    copracs = copracs.merge(npi.gender, left_on='NPI', right_on='npi')
 
+    # waiver dates from new file
 
+    s = SAMHSA()
+    # can eventually kill this when class gets updated
+    s.samhsa['Date'] = s.samhsa.Date.apply(
+        lambda x: stata_elapsed_date_to_datetime(x, 'td'))
+    samhsa_match = s.samhsa[['WaiverType', 'samhsa_id', 'Date']].drop_duplicates()
+    samhsa_match = samhsa_match.merge(matches)
+    sam = (samhsa_match[['npi', 'Date', 'WaiverType']]
+           .groupby(['npi', 'WaiverType'])
+           .min()
+           .unstack(1)
+           .reset_index())
+    sam.columns = ['npi', 'Date30', 'Date100', 'Date275']
+
+    copracs = copracs.merge(sam, how='left')
     # df1 = conform_data_sources(
     #     s, ['practitioner_type', 'state', 'zip5', 'tel'])
     # df2 = conform_data_sources(

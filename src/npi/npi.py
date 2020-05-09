@@ -108,7 +108,7 @@ class NPI(object):
         if hasattr(self, 'pgender') or self.entities in [2, [2]]:
             return
         from .utils.globalcache import c
-        self.pgender = c.get_name(
+        self.pgender = c.get_gender(
             self.src, self.npis, self.entity, 'pgender')
 
     def get_pfnameoth(self):
@@ -569,6 +569,21 @@ def get_name(src, npis, entity, name_stub):
     name = (name.merge(entity.query('entity==1')).drop(columns=['entity']))
     name = purge_nulls(name, '%s' % name_stub, ['npi'])
     return name
+
+
+def get_gender(src, npis, entity):
+    """
+    Retrieves pfname, pmname, and plname
+    Only for entity type 1
+    Returns non-temporal data: all names associated with a given NPI
+    """
+    gender = read_csv_npi(os.path.join(src, 'pgender.csv'), npis)
+    gender['pgender'] = gender['pgender'].str.upper()
+    gender = gender.drop(columns='month').groupby('npi').last().reset_index()
+    assert gender.dropna().merge(entity).entity.value_counts().index == [1]
+    gender = (gender.merge(entity.query('entity==1')).drop(columns=['entity']))
+    assert gender.npi.is_unique
+    return gender
 
 
 def get_nameoth(src, npis, entity, name_stub):
