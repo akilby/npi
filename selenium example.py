@@ -1,7 +1,6 @@
-from selenium import webdriver
 import chromedriver_binary
+from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.keys import Keys
 
 options = Options()
 options.add_argument('--headless')
@@ -29,4 +28,3 @@ ayys[21].click()
 
 e = 'MainContent_MainContentContainer_repSection2_ctl00_0_SchoolLocation_0'
 education = driver.find_element_by_id(e).text
-

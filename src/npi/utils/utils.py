@@ -2,6 +2,7 @@ import calendar
 import datetime
 import glob
 import os
+import sys
 import urllib
 import warnings
 import zipfile
@@ -11,6 +12,10 @@ from pprint import pprint
 import pandas as pd
 import requests
 import wget
+
+
+def hasher(thing):
+    return hash(thing) % ((sys.maxsize + 1) * 2)
 
 
 def longprint(df):

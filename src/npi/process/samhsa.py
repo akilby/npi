@@ -3,7 +3,7 @@ from cache.utils.utils import pickle_read
 from npi.npi import NPI, convert_practitioner_data_to_long
 from npi.pecos import PECOS
 from npi.samhsa import SAMHSA
-from npi.utils.utils import stata_elapsed_date_to_datetime
+from npi.utils.utils import isid
 
 
 def getcol(df, src, idvar, col, newname):
@@ -377,11 +377,11 @@ def match_samhsa_npi():
 
 
 def analysis_dataset():
+    # some of this should get added to the PECOS class
+    # including also the name match
     # Get matches of NPI to SAMHSA
     # matches = (pd.read_csv('/work/akilby/npi/final_matches.csv')
     #              .drop(columns='Unnamed: 0'))
-    matches = pickle_read(
-        '/work/akilby/npi/Cache/Caches/output_1588990540883395.pkl')
     # from npi.utils.globalcache import c
     # matches = c.match_samhsa_npi()
 
@@ -396,7 +396,7 @@ def analysis_dataset():
                    'Suffix', 'State', 'Zip Code', 'Phone Number'])
     pecos.retrieve('practitioner_type')
 
-    # 1. Select MD/DO from either NPI or PECOS (plus Samhsa?)
+    # 1. Select MD/DO and NPs from either NPI or PECOS
     practitioners = (pecos.practitioner_type.merge(npi_practype,
                                                    how='left',
                                                    left_on="NPI",
@@ -411,39 +411,59 @@ def analysis_dataset():
                             | (practitioners['PractitionerType'] == "NP")]
     nps = nps.NPI.drop_duplicates()
 
-    pecos_groups = PECOS(['NPI', 'Organization legal name',
-                          'Group Practice PAC ID',
-                          'Number of Group Practice members',
-                          'Hospital affiliation CCN 1',
-                          'Hospital affiliation LBN 1',
-                          'Hospital affiliation CCN 2',
-                          'Hospital affiliation LBN 2',
-                          'Hospital affiliation CCN 3',
-                          'Hospital affiliation LBN 3',
-                          'Hospital affiliation CCN 4',
-                          'Hospital affiliation LBN 4',
-                          'Hospital affiliation CCN 5',
-                          'Hospital affiliation LBN 5'],
-                         drop_duplicates=False, date_var=True)
+    # pecos_groups = PECOS(['NPI', 'Organization legal name',
+    #                       'Group Practice PAC ID',
+    #                       'Number of Group Practice members',
+    #                       'Hospital affiliation CCN 1',
+    #                       'Hospital affiliation LBN 1',
+    #                       'Hospital affiliation CCN 2',
+    #                       'Hospital affiliation LBN 2',
+    #                       'Hospital affiliation CCN 3',
+    #                       'Hospital affiliation LBN 3',
+    #                       'Hospital affiliation CCN 4',
+    #                       'Hospital affiliation LBN 4',
+    #                       'Hospital affiliation CCN 5',
+    #                       'Hospital affiliation LBN 5'],
+    #                      drop_duplicates=False, date_var=True)
 
+    # 2. Get group practice information. most sole practitioners
+    # are missing a group practice ID
     pecos_groups_loc = PECOS(['NPI', 'Organization legal name',
                               'Group Practice PAC ID',
                               'Number of Group Practice members',
                               'State', 'Zip Code', 'Phone Number'],
                              drop_duplicates=False, date_var=True)
 
-    pecos_groups_loc.physician_compare = (pecos_groups_loc
-                                          .physician_compare
-                                          .drop_duplicates())
+    groups = pecos_groups_loc.physician_compare.drop_duplicates()
 
-    coprac = (pecos_groups_loc
-              .physician_compare[['Group Practice PAC ID', 'Zip Code', 'date']]
-              .drop_duplicates()
-              .dropna())
+    groups = groups.reset_index(drop=True).reset_index()
+    # A bunch of sole practitioners (groupsize =1 ) are missing
+    # give them a single-period group practice ID (not constant over
+    # time even though other IDs are)
+    groups.loc[
+        groups['Group Practice PAC ID'].isnull(),
+        'Group Practice PAC ID'] = (groups['index'] + 100000000000)
+    groups = groups.drop(columns='index')
+    groups = groups.merge(
+        groups[['NPI', 'Group Practice PAC ID', 'date']]
+        .drop_duplicates()
+        .groupby(['Group Practice PAC ID', 'date'])
+        .size()
+        .reset_index())
+    groups.loc[
+        groups['Number of Group Practice members'].isnull(),
+        'Number of Group Practice members'] = groups[0]
+    groups.drop(columns=[0], inplace=True)
+
+    coprac = (groups[['Group Practice PAC ID',
+                      'Number of Group Practice members',
+                      'State',
+                      'Zip Code', 'date']]
+              .drop_duplicates())
+
     coprac_ids = coprac.reset_index(drop=True).reset_index().rename(
         columns={'index': 'group_prac_zip_date_id'})
-    coprac_np_counts = (pecos_groups_loc
-                        .physician_compare
+    coprac_np_counts = (groups
                         .merge(nps)
                         .merge(coprac_ids))
     idvars = ['group_prac_zip_date_id', 'date', 'NPI']
@@ -453,19 +473,36 @@ def analysis_dataset():
                         .size()
                         .reset_index()
                         .rename(columns={0: 'np_count'}))
-    coprac_mds = (pecos_groups_loc
-                  .physician_compare
+    coprac_mds = (groups
                   .merge(mddo)
                   .merge(coprac_ids))
     coprac_mds = coprac_mds[idvars].drop_duplicates()
     coprac_mds = coprac_mds.merge(coprac_np_counts, how='left')
     coprac_mds['np_count'] = coprac_mds.np_count.fillna(0)
-    mins = (coprac_mds
-            .drop(columns='group_prac_zip_date_id')
-            .groupby(['NPI', 'date'], as_index=False).min())
-    maxes = (coprac_mds.drop(columns='group_prac_zip_date_id')
-                       .groupby(['NPI', 'date'], as_index=False).max())
-    copracs = mins.merge(maxes.rename(columns={'np_count': 'np_count_max'}))
+    preproc = (coprac_mds
+               .sort_values(['NPI', 'date', 'np_count',
+                             'group_prac_zip_date_id'])
+               .groupby(['NPI', 'date']))
+    mins = preproc.first()
+    maxes = preproc.last()
+    mins = (mins
+            .reset_index()
+            .merge(coprac_ids)
+            .sort_values(['NPI', 'date'])
+            .reset_index(drop=True))
+    maxes = (maxes
+             .reset_index()
+             .merge(coprac_ids)
+             .sort_values(['NPI', 'date'])
+             .reset_index(drop=True))
+
+    copracs = mins.merge(maxes, on=['NPI', 'date'], suffixes=['_min', '_max'])
+    # mins = (coprac_mds
+    #         .drop(columns='group_prac_zip_date_id')
+    #         .groupby(['NPI', 'date'], as_index=False).min())
+    # maxes = (coprac_mds.drop(columns='group_prac_zip_date_id')
+    #                    .groupby(['NPI', 'date'], as_index=False).max())
+    # copracs = mins.merge(maxes.rename(columns={'np_count': 'np_count_max'}))
     assert (copracs[['NPI', 'date']].drop_duplicates().shape[0]
             == copracs.shape[0])
     # Specialties. time varying?
@@ -473,46 +510,58 @@ def analysis_dataset():
                          'Secondary specialty 1',
                          'Secondary specialty 2',
                          'Secondary specialty 3',
-                         'Secondary specialty 4'])
-
-    pecos_education = PECOS(['NPI', 'Medical school name', 'Graduation year'])
+                         'Secondary specialty 4'],
+                        drop_duplicates=False, date_var=True)
 
     mddo = pecos_specs.physician_compare.merge(mddo)
-    prim_spec = pd.concat([mddo['NPI'],
-                           pd.get_dummies(
-                            mddo['Primary specialty'])],
-                          axis=1).groupby('NPI').sum()
-    prim_spec = 1*(prim_spec > 0)
+    prim_spec = mddo[['NPI', 'date', 'Primary specialty']].drop_duplicates()
+    prim_spec = prim_spec.groupby(['NPI', 'date']).first().reset_index()
+    # prim_spec = pd.concat([m[['NPI', 'date']],
+    #                        pd.get_dummies(
+    #                         m['Primary specialty'])],
+    #                       axis=1).groupby(['NPI', 'date']).sum()
+    # prim_spec = 1*(prim_spec > 0)
 
     sec_spec = (mddo.drop(columns=['Primary specialty'])
-                    .set_index('NPI')
+                    .drop_duplicates()[mddo.drop(columns=['Primary specialty'])
+                                           .drop_duplicates()
+                                           .isnull().sum(1) < 4]
+                    .set_index(['NPI', 'date'])
                     .stack()
                     .reset_index()
-                    .drop(columns='level_1')
+                    .drop(columns='level_2')
                     .dropna()
                     .drop_duplicates()
                     .rename(columns={0: 'secondary_spec'})
                     .query('secondary_spec!=" "'))
-    sec_spec = pd.concat([sec_spec['NPI'],
+    sec_spec = pd.concat([sec_spec[['NPI', 'date']],
                           pd.get_dummies(
                           sec_spec['secondary_spec'])],
-                         axis=1).groupby('NPI').sum()
+                         axis=1).groupby(['NPI', 'date']).sum()
     sec_spec = 1*(sec_spec > 0)
 
-    copracs = copracs.merge(prim_spec.reset_index())
-    copracs = copracs.merge(sec_spec, how='left')
-    # copracs.merge(sec_spec.reset_index(), how='left')
-    copracs = copracs.merge(pecos_education.physician_compare[['NPI', 'Graduation year']].groupby('NPI', as_index=False).first())
-    pd.cut(copracs['Graduation year'], 20)
-    copracs = copracs.merge(npi.gender, left_on='NPI', right_on='npi')
+    copracs = copracs.merge(prim_spec)
+    # copracs = copracs.merge(sec_spec, how='left')
+    copracs = copracs.merge(sec_spec.reset_index(), how='left')
+    copracs = copracs.fillna({x: 0 for x in sec_spec.columns})
+    # copracs = copracs.merge(mddo[['NPI', 'Primary specialty']])
+    pecos_education = PECOS(['NPI', 'Medical school name', 'Graduation year'])
+    copracs = (copracs
+               .merge(pecos_education
+                      .physician_compare[['NPI', 'Graduation year']]
+                      .groupby('NPI', as_index=False)
+                      .first()))
+    copracs['gradyear'] = pd.qcut(copracs['Graduation year'], 20)
+    copracs = copracs.merge(npi.pgender, left_on='NPI', right_on='npi')
 
     # waiver dates from new file
 
+    matches = pickle_read(
+        '/work/akilby/npi/Cache/Caches/output_1588990540883395.pkl')
+
     s = SAMHSA()
-    # can eventually kill this when class gets updated
-    s.samhsa['Date'] = s.samhsa.Date.apply(
-        lambda x: stata_elapsed_date_to_datetime(x, 'td'))
-    samhsa_match = s.samhsa[['WaiverType', 'samhsa_id', 'Date']].drop_duplicates()
+    samhsa_match = (s.samhsa[['WaiverType', 'samhsa_id', 'Date']]
+                     .drop_duplicates())
     samhsa_match = samhsa_match.merge(matches)
     sam = (samhsa_match[['npi', 'Date', 'WaiverType']]
            .groupby(['npi', 'WaiverType'])
@@ -522,6 +571,22 @@ def analysis_dataset():
     sam.columns = ['npi', 'Date30', 'Date100', 'Date275']
 
     copracs = copracs.merge(sam, how='left')
+    copracs = copracs.drop(columns=['NPI', 'Graduation year'])
+    copracs['Group Practice PAC ID_min'] = copracs['Group Practice PAC ID_min'].astype(int)
+    copracs['Group Practice PAC ID_max'] = copracs['Group Practice PAC ID_max'].astype(int)
+    copracs['Number of Group Practice members_min'] = copracs['Number of Group Practice members_min'].astype(int)
+    copracs['Number of Group Practice members_max'] = copracs['Number of Group Practice members_max'].astype(int)
+    copracs['State_min'] = copracs['State_min'].astype(str)
+    copracs['State_max'] = copracs['State_max'].astype(str)
+    copracs['Zip Code_min'] = copracs['Zip Code_min'].astype(str)
+    copracs['Zip Code_max'] = copracs['Zip Code_max'].astype(str)
+    copracs['Primary specialty'] = copracs['Primary specialty'].astype(str)
+    isid(copracs, ['npi', 'date'])
+
+    # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
+    #                  write_index=False)
+
+
     # df1 = conform_data_sources(
     #     s, ['practitioner_type', 'state', 'zip5', 'tel'])
     # df2 = conform_data_sources(
