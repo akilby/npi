@@ -572,16 +572,20 @@ def analysis_dataset():
 
     copracs = copracs.merge(sam, how='left')
     copracs = copracs.drop(columns=['NPI', 'Graduation year'])
-    copracs['Group Practice PAC ID_min'] = copracs['Group Practice PAC ID_min'].astype(int)
-    copracs['Group Practice PAC ID_max'] = copracs['Group Practice PAC ID_max'].astype(int)
-    copracs['Number of Group Practice members_min'] = copracs['Number of Group Practice members_min'].astype(int)
-    copracs['Number of Group Practice members_max'] = copracs['Number of Group Practice members_max'].astype(int)
+    for variable in ['Group Practice PAC ID_min',
+                     'Group Practice PAC ID_max',
+                     'Number of Group Practice members_min',
+                     'Number of Group Practice members_max']:
+        copracs[variable] = copracs[variable].astype(int)
     copracs['State_min'] = copracs['State_min'].astype(str)
     copracs['State_max'] = copracs['State_max'].astype(str)
     copracs['Zip Code_min'] = copracs['Zip Code_min'].astype(str)
     copracs['Zip Code_max'] = copracs['Zip Code_max'].astype(str)
     copracs['Primary specialty'] = copracs['Primary specialty'].astype(str)
     isid(copracs, ['npi', 'date'])
+    return copracs
+
+    
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
     #                  write_index=False)
