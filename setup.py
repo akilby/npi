@@ -12,5 +12,9 @@ setup(name='npi',
       package_dir={'': 'src'},
       install_requires=['pandas'],
       zip_safe=False,
-      entry_points={}
+      entry_points={
+        'console_scripts': [
+            'npi = npi.__main__:main',
+        ],
+      }
       )
