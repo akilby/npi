@@ -29,8 +29,7 @@ class CommandLine(object):
             '\t--download NPPES')
 
     def download(self, args):
-        print(args)
-        if args.download.upper() == 'NPPES':
+        if args.source.upper() == 'NPPES':
             nppes_download()
 
 
