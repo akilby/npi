@@ -1,6 +1,9 @@
 import argparse
 
 from .download.nppes import main as nppes_download
+from .process.nppes import main_process_variable
+
+# main_process_variable(variable, update)
 
 
 class CommandLine(object):
@@ -14,6 +17,7 @@ class CommandLine(object):
             dest='subcommand', description='Subcommands required.')
 
         self.setup_download_parser(subparsers)
+        self.setup_process_parser(subparsers)
         self.parser = parser
 
     def main(self):
@@ -28,9 +32,31 @@ class CommandLine(object):
             help='Source to download. Includes:\n'
             '\t--download NPPES')
 
+    def setup_process_parser(self, subparsers):
+        parser_process = subparsers.add_parser('process')
+        parser_process.set_defaults(func=self.process)
+        parser_process.add_argument(
+            '--source', required=True,
+            help='Source to process. Includes:\n'
+            '\t--process NPPES')
+        parser_process.add_argument(
+            '--variable', required=False,
+            help='If you only want to process one variable, '
+            'specify here')
+        parser_process.add_argument(
+            '--update', required=False,
+            choices=['True', 'Force', 'False'],
+            help='If you want to only update [True], '
+            'not destroy and recreate [False]. [Force] updates'
+            'last 6 months even if there are not any new datafiles found.')
+
     def download(self, args):
         if args.source.upper() == 'NPPES':
             nppes_download()
+
+    def process(self, args):
+        if args.source.upper() == 'NPPES':
+            main_process_variable(args.variable, args.update)
 
 
 def main():

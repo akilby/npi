@@ -8,10 +8,6 @@ The NPI package manages known publicly-available data on physicians and other he
 This downloads NPI/NPPES data from two sources: CMS and the NBER. NBER data is downloaded by variable, and downloads those specified in `constants.py`.
 
 ```bash
-python -m npi.download.nppes
-```
-
-```bash
 npi download --source NPPES
 ```
 
@@ -21,3 +17,10 @@ npi download --source NPPES
 See an example notebook here:
 
 [NPI Database Query Example](https://github.com/akilby/npi/blob/master/NPI%20Database%20Query%20Example.ipynb)
+
+
+### Old
+
+```bash
+python -m npi.download.nppes
+```
