@@ -1,7 +1,7 @@
 import argparse
 
 from .download.nppes import main as nppes_download
-from .process.nppes import main_process_variable
+from .process.nppes import main_process_variable, update_all
 
 # main_process_variable(variable, update)
 
@@ -40,15 +40,21 @@ class CommandLine(object):
             help='Source to process. Includes:\n'
             '\t--process NPPES')
         parser_process.add_argument(
-            '--variable', required=False,
+            '--variable', required=False, default=None,
             help='If you only want to process one variable, '
             'specify here')
         parser_process.add_argument(
             '--update', required=False,
             choices=['True', 'Force', 'False'],
+            default='True',
             help='If you want to only update [True], '
             'not destroy and recreate [False]. [Force] updates'
             'last 6 months even if there are not any new datafiles found.')
+        parser_process.add_argument(
+            '--max-jobs', required=False,
+            default=6,
+            help='runs this number of processing jobs from the login node '
+                 'at a given time')
 
     def download(self, args):
         if args.source.upper() == 'NPPES':
@@ -56,7 +62,10 @@ class CommandLine(object):
 
     def process(self, args):
         if args.source.upper() == 'NPPES':
-            main_process_variable(args.variable, args.update)
+            if args.variable:
+                main_process_variable(args.variable, args.update)
+            else:
+                update_all(max_jobs=args.max_jobs)
 
 
 def main():
