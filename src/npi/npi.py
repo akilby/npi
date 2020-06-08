@@ -19,7 +19,10 @@ src = '/work/akilby/npi/data/'
 
 
 class NPI(object):
-    def __init__(self, src=src, npis=None, entities=[1, 2]):
+    def __init__(self, src=src, npis=None, entities=[1, 2], rerun=False):
+        from .utils.globalcache import c
+        c.rerun = rerun
+        self.c = c
         self.src = src
         self.npis = npis
         self.entities = _normalize_entities(entities)
@@ -49,14 +52,12 @@ class NPI(object):
     def get_npideactdate(self):
         if hasattr(self, 'npideactdate'):
             return
-        from .utils.globalcache import c
-        self.npideactdate = c.get_deactdate(self.src, self.npis)
+        self.npideactdate = self.c.get_deactdate(self.src, self.npis)
 
     def get_npireactdate(self):
         if hasattr(self, 'npireactdate'):
             return
-        from .utils.globalcache import c
-        self.npireactdate = c.get_reactdate(self.src, self.npis)
+        self.npireactdate = self.c.get_reactdate(self.src, self.npis)
 
     def get_removaldate(self):
         if hasattr(self, 'removaldate'):

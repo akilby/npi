@@ -7,8 +7,11 @@ The NPI package manages known publicly-available data on physicians and other he
 
 This downloads NPI/NPPES data from two sources: CMS and the NBER. NBER data is downloaded by variable, and downloads those specified in `constants.py`.
 
+Some common uses of the module can be accessed at the command line:
+
 ```bash
 npi download --source NPPES
+npi process --source NPPES --variable npireactdate --update True
 ```
 
 
