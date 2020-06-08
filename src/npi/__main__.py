@@ -55,6 +55,10 @@ class CommandLine(object):
             default=6,
             help='runs this number of processing jobs from the login node '
                  'at a given time')
+        parser_process.add_argument(
+            '--exclude', required=False, nargs='+',
+            default=[],
+            help='exclude some variables')
 
     def download(self, args):
         if args.source.upper() == 'NPPES':
@@ -65,7 +69,8 @@ class CommandLine(object):
             if args.variable:
                 main_process_variable(args.variable, args.update)
             else:
-                update_all(max_jobs=args.max_jobs)
+                print('updating all variables except', args.exclude)
+                update_all(max_jobs=args.max_jobs, exclude=args.exclude)
 
 
 def main():

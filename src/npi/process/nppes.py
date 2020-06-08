@@ -363,13 +363,17 @@ def main_single():
     main_process_variable(variable, update)
 
 
-def update_all(max_jobs=6):
+def update_all(max_jobs=6, exclude=[]):
     """Must be run on a login node, submits multiple jobs"""
-    # ploc2 files aren't updating because the weekly updates aren't
-    # being properly separated out
     from jobs.run import RunScript
     list_of_jobs = []
     varl = USE_VAR_LIST.copy()
+    varl = [x for x in varl if x not in exclude]
+    # ploc2 files aren't updating because the weekly updates aren't
+    # being properly separated out
+    # --> temp
+    varl = [x for x in varl if not x.startswith('ploc2')]
+    print('final update list:', varl)
     while len(varl) > 0:
         while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
                < max_jobs):
