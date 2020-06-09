@@ -104,6 +104,7 @@ def medicare_program_engagement():
     and exited the three different medicare databases: Part B, Part D, and
     Physician Compare
     """
+    from .utils.globalcache import c
     partd = part_d_files(summary=True,
                          usecols=['npi', 'total_claim_count'])
     partd_engage = (partd.assign(PartD_Max_Year=lambda df: df.Year,
@@ -121,9 +122,9 @@ def medicare_program_engagement():
                          .agg({'PartB_Min_Year': min, 'PartB_Max_Year': max})
                          .rename(columns={'National Provider Identifier':
                                           'npi'}))
-    pc = physician_compare_select_vars([],
-                                       drop_duplicates=False,
-                                       date_var=True)
+    pc = c.physician_compare_select_vars([],
+                                         drop_duplicates=False,
+                                         date_var=True)
     pc_engage = (pc.assign(Year=pc.date.dt.year)
                    .drop(columns='date')
                    .drop_duplicates())
@@ -157,8 +158,9 @@ def medical_school(include_web_scraped=True):
     Also has the option of bringing in approx. 127 entries from the
     web-scraped database.
     """
+    from .utils.globalcache import c
     cols = ['Medical school name', 'Graduation year']
-    med_school = physician_compare_select_vars(cols)
+    med_school = c.physician_compare_select_vars(cols)
     nodups = med_school[~med_school['NPI'].duplicated(keep=False)]
     isid(nodups, ['NPI'], noisily=True)
     dups = med_school[med_school['NPI'].duplicated(keep=False)]
