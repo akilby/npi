@@ -132,10 +132,21 @@ def medicare_program_engagement():
                           .groupby('NPI', as_index=False)
                           .agg({'PC_Min_Year': min, 'PC_Max_Year': max})
                           .rename(columns={'NPI': 'npi'}))
-    return (pc_engage
-            .merge(partd_engage, how='outer')
-            .merge(partb_engage, how='outer')
-            .convert_dtypes({x: 'Int64' for x in pc_engage.columns}))
+    df = (pc_engage
+          .merge(partd_engage, how='outer')
+          .merge(partb_engage, how='outer')
+          .convert_dtypes({x: 'Int64' for x in pc_engage.columns}))
+
+    df.loc[((df.PC_Max_Year == 2020)
+            | (df.PartD_Max_Year == 2017)
+            | (df.PartB_Max_Year == 2017))
+           & ~((df.PartD_Max_Year.notnull()
+                & df.PartB_Max_Year.notnull()
+                & (df.PC_Max_Year < 2020))), 'maybe_active'] = True
+    df = df.assign(maybe_active=df.maybe_active.fillna(False))
+    df.loc[df.PC_Max_Year == 2020, 'active_2020'] = True
+    df = df.assign(active_2020=df.active_2020.fillna(False))
+    return df
 
 
 def medical_school(include_web_scraped=True):

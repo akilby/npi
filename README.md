@@ -11,9 +11,20 @@ Some common uses of the module can be accessed at the command line:
 
 ```bash
 npi download --source NPPES
-npi process --source NPPES --variable npireactdate --update True
+npi process --source NPPES --update True
 ```
 
+To process only one variable:
+
+```bash
+npi process --source NPPES --variable npideactdate --update True
+```
+
+To process everything except a list of variables:
+
+```bash
+npi process --source NPPES --update True --exclude npideactdate npireactdate 
+```
 
 ### Using the package as an API
 

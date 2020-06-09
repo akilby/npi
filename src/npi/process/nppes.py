@@ -375,8 +375,8 @@ def update_all(max_jobs=6, exclude=[]):
     varl = [x for x in varl if not x.startswith('ploc2')]
     print('final update list:', varl)
     while len(varl) > 0:
-        while (sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
-               < max_jobs):
+        while ((sum([x.query_details(pause=20) != 0 for x in list_of_jobs])
+                < max_jobs) and len(varl) > 0):
             u = varl.pop(0)
             print(f'Running: {u}')
             commands = ('from npi.process.nppes import main_process_variable\n'
