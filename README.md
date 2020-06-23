@@ -38,28 +38,3 @@ See an example notebook here:
 ```bash
 python -m npi.download.nppes
 ```
-
-Running: pnamesuffix
-Timestamp ID: 1592577025853898
-
-Slurm ID: 12289429
-Running: pgender
-Timestamp ID: 1592577046590159
-
-Slurm ID: 12289430
-Running: porgnameoth
-Timestamp ID: 1592577086947340
-
-Slurm ID: 12289432
-Running: entity
-Timestamp ID: 1592577148199020
-
-Slurm ID: 12289433
-Running: ploccityname
-Timestamp ID: 1592577228689550
-
-Slurm ID: 12289438
-Running: pmnameoth
-Timestamp ID: 1592577329233012
-
-Slurm ID: 12289441

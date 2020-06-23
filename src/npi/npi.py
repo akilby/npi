@@ -654,7 +654,8 @@ def categorize_taxcodes(df):
     return df
 
 
-def get_taxcode(src, npis, entity, entities, temporal=False):
+def get_taxcode(src, npis, entity, entities,
+                temporal=False, taxcode_details=True):
     """
     Retrieves taxonomy codes (including all 15 entries if necessary)
     Entity type 1 or 2 can have a taxcode
@@ -671,24 +672,33 @@ def get_taxcode(src, npis, entity, entities, temporal=False):
         taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
     if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
         taxcode_e1 = (taxcode.merge(entity.query('entity==1')))
-        taxcode_e1 = categorize_taxcodes(taxcode_e1)
+        # taxcode_e1 = categorize_taxcodes(taxcode_e1)
+        if taxcode_details:
+            taxcode_e1 = taxcode_e1.merge(
+                provider_taxonomies().rename(
+                    columns={'TaxonomyCode': 'ptaxcode'}))
     if entities in [2, [2]] or entities == [1, 2] or entities == [2, 1]:
         taxcode_e2 = (taxcode.merge(entity.query('entity==2')))
+        if taxcode_details:
+            taxcode_e2 = taxcode_e2.merge(
+                provider_taxonomies().rename(
+                    columns={'TaxonomyCode': 'ptaxcode'}))
     if not temporal:
         if entities in [1, [1]]:
-            return taxcode_e1
+            return taxcode_e1.drop(columns='entity')
         elif entities in [2, [2]]:
-            return taxcode_e2
+            return taxcode_e2.drop(columns='entity')
         elif entities == [1, 2] or entities == [2, 1]:
             return taxcode_e1.append(taxcode_e2)
     else:
         if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
             if entities in [1, [1]]:
-                taxcode_all = taxcode_all.query('entity==1')
-            taxcode_all = categorize_taxcodes(taxcode_all)
+                taxcode_all = (taxcode_all.query('entity==1')
+                                          .drop(columns='entity'))
+            # taxcode_all = categorize_taxcodes(taxcode_all)
             return taxcode_all
         elif entities in [2, [2]]:
-            return taxcode_all.query('entity==2')
+            return taxcode_all.query('entity==2').drop(columns='entity')
 
 
 def get_lic(src, npis, entity, removaldate, name_stub, temporal=False):
