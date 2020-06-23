@@ -961,10 +961,10 @@ def credentials_map(return_type='DataFrame'):
          'Optometrist': ['OD'],
          'Psychologist': ['PSYD', 'PSYCHOLOGIST'],
          'RN': ['RN', 'REGISTEREDNURSE', 'RN-BC', 'RNFA', 'RNBSN', 'RNC'],
-         'LPN': ['LPN', 'LVN', 'LICENSEDPRACTICALN', 'PRACTICALNURSE',
-                 'LICENSEDVOCATIONAL', 'LVNII', 'LPN-IV', 'LPN-M-IV',
-                 'LICENSEPRACTICALNU', 'NURSELPN', 'LPNII', 'LPNNURSE',
-                 'LPNM-IV', 'LPN/LVN']
+         'LPN/LVN': ['LPN', 'LVN', 'LICENSEDPRACTICALN', 'PRACTICALNURSE',
+                     'LICENSEDVOCATIONAL', 'LVNII', 'LPN-IV', 'LPN-M-IV',
+                     'LICENSEPRACTICALNU', 'NURSELPN', 'LPNII', 'LPNNURSE',
+                     'LPNM-IV', 'LPN/LVN']
          }
     if return_type == 'dict':
         return d
