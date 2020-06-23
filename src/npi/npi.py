@@ -339,7 +339,10 @@ class NPI(object):
         self.get_ptaxcode()
 
         credentials_orig = self.credentials
-        taxcode_orig = self.ptaxcode.query('entity==1')
+        taxcode_orig = (self.ptaxcode
+                            .merge(self.entity)
+                            .query('entity==1'))
+        taxcode_orig = categorize_taxcodes(taxcode_orig)
 
         # gets rid of student codes if we can identify what
         # a person later becomes using credentials or taxcodes.
@@ -360,6 +363,8 @@ class NPI(object):
                                 .fillna(0)
                                 .groupby('npi').max())
 
+        # don't mark you as student or no-category if you later have an
+        # identiable practitioner type
         prac_type = prac_type.assign(su=(prac_type[[x for x
                                                     in prac_type.columns
                                                     if x != "No Category"
@@ -624,15 +629,27 @@ def categorize_taxcodes(df):
     cns = (tax.query('Classification == "Clinical Nurse Specialist"')
               .TaxonomyCode
               .tolist())
+    lpn_lvn = (tax.query('(Type=="Nursing Service Providers" '
+                         'or Type=="Nursing Service Related Providers") '
+                         'and (Classification=="Licensed Practical Nurse" '
+                         'or Classification=="Licensed Vocational Nurse")')
+                  .TaxonomyCode.tolist())
+    rn = (tax.query('(Type=="Nursing Service Providers" '
+                    'or Type=="Nursing Service Related Providers") '
+                    'and Classification=="Registered Nurse"')
+             .TaxonomyCode.tolist())
     nurses = (tax.query('Type=="Nursing Service Providers" or Type=='
                         '"Nursing Service Related Providers"')
                  .TaxonomyCode.tolist())
+    nurses = [x for x in nurses if x not in rn + lpn_lvn]
+
     c = tax.query('Classification=="Chiropractor"').TaxonomyCode.tolist()
     d = tax.query('Classification=="Dentist"').TaxonomyCode.tolist()
     po = tax.query('Classification=="Podiatrist"').TaxonomyCode.tolist()
     ph = tax.query('Classification=="Pharmacist"').TaxonomyCode.tolist()
     o = tax.query('Classification=="Optometrist"').TaxonomyCode.tolist()
     p = tax.query('Classification=="Psychologist"').TaxonomyCode.tolist()
+    oaprn = tax.query('TaxonomyCode=="367H00000X"').TaxonomyCode.tolist()
     student = tax.query('TaxonomyCode=="390200000X"').TaxonomyCode.tolist()
 
     df.loc[(df.ptaxcode.isin(pa) & df.entity == 1), 'cat'] = 'PA'
@@ -641,7 +658,10 @@ def categorize_taxcodes(df):
     df.loc[(df.ptaxcode.isin(crna) & df.entity == 1), 'cat'] = 'CRNA'
     df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
     df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
-    df.loc[(df.ptaxcode.isin(nurses) & df.entity == 1), 'cat'] = 'Nursing'
+    df.loc[(df.ptaxcode.isin(rn) & df.entity == 1), 'cat'] = 'RN'
+    df.loc[(df.ptaxcode.isin(lpn_lvn) & df.entity == 1), 'cat'] = 'LPN/LVN'
+    df.loc[(df.ptaxcode.isin(nurses) & df.entity == 1), 'cat'] = 'Other Nurse'
+    df.loc[(df.ptaxcode.isin(oaprn) & df.entity == 1), 'cat'] = 'Other APRN'
 
     df.loc[(df.ptaxcode.isin(c) & df.entity == 1), 'cat'] = 'Chiropractor'
     df.loc[(df.ptaxcode.isin(d) & df.entity == 1), 'cat'] = 'Dentist'
