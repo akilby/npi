@@ -624,6 +624,9 @@ def categorize_taxcodes(df):
     cns = (tax.query('Classification == "Clinical Nurse Specialist"')
               .TaxonomyCode
               .tolist())
+    nurses = (tax.query('Type=="Nursing Service Providers" or Type=='
+                        '"Nursing Service Related Providers"')
+                 .TaxonomyCode.tolist())
     c = tax.query('Classification=="Chiropractor"').TaxonomyCode.tolist()
     d = tax.query('Classification=="Dentist"').TaxonomyCode.tolist()
     po = tax.query('Classification=="Podiatrist"').TaxonomyCode.tolist()
@@ -638,6 +641,7 @@ def categorize_taxcodes(df):
     df.loc[(df.ptaxcode.isin(crna) & df.entity == 1), 'cat'] = 'CRNA'
     df.loc[(df.ptaxcode.isin(cnm) & df.entity == 1), 'cat'] = 'CNM'
     df.loc[(df.ptaxcode.isin(cns) & df.entity == 1), 'cat'] = 'CNS'
+    df.loc[(df.ptaxcode.isin(nurses) & df.entity == 1), 'cat'] = 'Nursing'
 
     df.loc[(df.ptaxcode.isin(c) & df.entity == 1), 'cat'] = 'Chiropractor'
     df.loc[(df.ptaxcode.isin(d) & df.entity == 1), 'cat'] = 'Dentist'
@@ -955,7 +959,12 @@ def credentials_map(return_type='DataFrame'):
          'Podiatrist': ['DPM'],
          'Pharmacist': ['PHARMD', 'RPH', 'PHARMACIST', 'DPH', 'BCPS'],
          'Optometrist': ['OD'],
-         'Psychologist': ['PSYD', 'PSYCHOLOGIST']
+         'Psychologist': ['PSYD', 'PSYCHOLOGIST'],
+         'RN': ['RN', 'REGISTEREDNURSE', 'RN-BC', 'RNFA', 'RNBSN', 'RNC'],
+         'LPN': ['LPN', 'LVN', 'LICENSEDPRACTICALN', 'PRACTICALNURSE',
+                 'LICENSEDVOCATIONAL', 'LVNII', 'LPN-IV', 'LPN-M-IV',
+                 'LICENSEPRACTICALNU', 'NURSELPN', 'LPNII', 'LPNNURSE',
+                 'LPNM-IV', 'LPN/LVN']
          }
     if return_type == 'dict':
         return d
