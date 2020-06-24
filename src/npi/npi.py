@@ -375,7 +375,7 @@ class NPI(object):
         prac_type = prac_type.drop(columns='su')
         for col in prac_type.columns:
             prac_type[col] = prac_type[col].astype(int)
-        prac_type = prac_type[['MD/DO', 'Dentist', 'Psychologist', 
+        prac_type = prac_type[['MD/DO', 'Dentist', 'Psychologist',
                                'Podiatrist', 'Optometrist', 'Chiropractor',
                                'Pharmacist', 'NP', 'CNM', 'CNS', 'CRNA',
                                'Other APRN', 'PA', 'RN', 'LPN/LVN',
