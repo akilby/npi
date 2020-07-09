@@ -10,12 +10,14 @@ they still practice
 
 """
 
+import numpy as np
 import pandas as pd
+from npi.npi import NPI
 
 from .download.medical_schools import final_data_path as med_school_path
 from .npi import expand_names_in_sensible_ways
 from .process.medicare import part_b_files, part_d_files
-from .process.physician_compare import physician_compare_select_vars
+# from .process.physician_compare import physician_compare_select_vars
 from .utils.utils import isid
 
 
@@ -193,3 +195,357 @@ def medical_school(include_web_scraped=True):
                      'grad_year': 'Graduation year'})).reset_index(drop=True)
         final['npi'] = final.npi.astype(int)
     return final
+
+
+def group_practices_infer():
+    # 2. Get group practice information. most sole practitioners
+    # are missing a group practice ID
+    pecos_groups_loc = PECOS(['NPI', 'Organization legal name',
+                              'Group Practice PAC ID',
+                              'Number of Group Practice members',
+                              'State', 'Zip Code', 'Phone Number'],
+                             drop_duplicates=False, date_var=True)
+
+    # Groups can change over time so start with groups
+    # with same dets over time
+    groups = (pecos_groups_loc
+              .physician_compare
+              .drop_duplicates()
+              .reset_index(drop=True))
+
+    groups.loc[groups['Organization legal name'] == " ",
+               'Organization legal name'] = np.nan
+    groups.loc[groups['Phone Number'].astype(str).str.len() != 12,
+               'Phone Number'] = np.nan
+
+    groups = groups.drop_duplicates()
+
+    # Split into dfs with group ids and no group ids
+    groupinfo = (groups.loc[groups['Group Practice PAC ID'].notnull()]
+                       .reset_index(drop=True))
+    missinggroup = (groups.loc[groups['Group Practice PAC ID'].isnull()]
+                          .reset_index(drop=True))
+
+    # Get any information that is consistent by NPI and Group Practice
+    # and update the missing information
+    # this mostly fixes phone numbers
+    idcols = ['NPI', 'Group Practice PAC ID']
+    cols = ['Zip Code', 'Organization legal name',
+            'Number of Group Practice members', 'State', 'Phone Number']
+    for col in cols:
+        df_u = isolate_consistent_info(groupinfo, idcols, col)
+        groupinfo = update_cols(groupinfo, df_u, idcols)
+
+    groupinfo = groupinfo.drop_duplicates().reset_index(drop=True)
+
+    # do the same fill-in for people missing group practice ids
+    npis_in_both = (missinggroup[['NPI']]
+                    .drop_duplicates()
+                    .merge(groupinfo['NPI'].drop_duplicates()))
+    mg1 = (missinggroup
+           .merge(npis_in_both, how='left', indicator=True)
+           .query('_merge=="left_only"')
+           .drop(columns='_merge'))
+    mg2 = (missinggroup
+           .merge(npis_in_both, how='left', indicator=True)
+           .query('_merge=="both"')
+           .drop(columns='_merge'))
+    idcols = ['NPI']
+    cols = ['Zip Code', 'Organization legal name',
+            'Number of Group Practice members', 'State', 'Phone Number']
+    for col in cols:
+        df_u = isolate_consistent_info(mg1, idcols, col)
+        if not df_u.empty:
+            mg1 = update_cols(mg1, df_u, idcols)
+
+    missinggroup = mg1.append(mg2).drop_duplicates().reset_index(drop=True)
+
+    # Can now look for people missing group numbers, to see if there
+    # is a unique match on state, zip, phone, date
+    # the majority of cases there are multiple group numbers
+    # but perhaps that's not actually right... perhaps these should be joined
+    pot_missing = (missinggroup[['State', 'Zip Code', 'Phone Number', 'date']]
+                   .drop_duplicates()
+                   .dropna()
+                   .reset_index(drop=True)
+                   .reset_index()
+                   .merge(groupinfo[['State', 'Zip Code', 'Phone Number',
+                                     'date', 'Group Practice PAC ID',
+                                     'Organization legal name']]
+                          .dropna(subset=['State', 'Zip Code', 'Phone Number',
+                                          'date', 'Group Practice PAC ID'])
+                          .drop_duplicates()))
+    miss = (pot_missing[~pot_missing['index']
+            .duplicated(keep=False)]
+            .drop(columns='index'))
+    missinggroup_u = update_cols(missinggroup, miss,
+                                 ['State', 'Zip Code', 'Phone Number', 'date'])
+
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    # Sole practices: number of group prac==1, npi, sometimes missing sometimes
+    # one group prac
+    solepracs = missinggroup[
+                    missinggroup['Number of Group Practice members'] == 1
+                    & missinggroup['Group Practice PAC ID'].isnull()]
+    # the below dropped vars all missing
+    solepracs = (solepracs
+                 .drop(columns=['date', 'Group Practice PAC ID',
+                                'Organization legal name', 'Phone Number'])
+                 .drop_duplicates())
+    solepracs = solepracs.merge(groupinfo)
+    df_s = isolate_consistent_info(
+        solepracs, ['NPI', 'Group Practice PAC ID'], 'Phone Number')
+    solepracs = update_cols(solepracs, df_s, ['NPI', 'Group Practice PAC ID'])
+    solepracs = (solepracs
+                 .drop(columns=['date'])
+                 .drop_duplicates()[~solepracs
+                                    .drop(columns=['date'])
+                                    .drop_duplicates()
+                                    .NPI.duplicated(keep=False)])
+    missinggroup_u = update_cols(
+        missinggroup, solepracs, ['NPI', 'Number of Group Practice members'])
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    # People exist across datasets, can match on NPI, without regard to date
+    miss_unique = (missinggroup[['State', 'Zip Code', 'Phone Number', 'NPI']]
+                   .drop_duplicates())
+    miss_unique = miss_unique[~miss_unique.NPI.duplicated(keep=False)]
+    miss_unique = miss_unique.merge(groupinfo)
+    ids = ['State', 'Zip Code', 'Phone Number', 'NPI', 'Group Practice PAC ID']
+    miss_unique = (miss_unique[ids].drop_duplicates()[~miss_unique[ids]
+                                                      .drop_duplicates()
+                                                      .NPI
+                                                      .duplicated(keep=False)])
+    missinggroup_u = update_cols(missinggroup,
+                                 miss_unique,
+                                 ['NPI', 'State', 'Zip Code', 'Phone Number'])
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    # similar, slightly different approach
+    ids = ['NPI', 'Number of Group Practice members', 'Zip Code',
+           'Phone Number', 'State']
+    d = missinggroup[ids].drop_duplicates().merge(
+        groupinfo[ids + ['Group Practice PAC ID']].drop_duplicates())
+
+    d = d[~d.NPI.duplicated(keep=False)]
+    missinggroup_u = update_cols(missinggroup, d, ids)
+
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+
+    # Make some new groupnos for unmatched sole proprietors
+    m = missinggroup[missinggroup['Number of Group Practice members'] == 1][['NPI','Zip Code','State']].drop_duplicates().reset_index(drop=True).reset_index() 
+    m['Group Practice PAC ID'] = (m['index'] + 200000000000).astype('Int64')
+    missinggroup_u = update_cols(
+        missinggroup, m.drop(columns='index'), ['NPI', 'State', 'Zip Code'])
+
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+
+    m = missinggroup[['State', 'Zip Code', 'Phone Number', 'date']].drop_duplicates().merge(groupinfo[['State', 'Zip Code', 'Phone Number', 'date', 'Group Practice PAC ID']].drop_duplicates()) 
+
+    new_groups = m[~m[['State', 'Zip Code', 'Phone Number', 'date']].duplicated(keep=False)] 
+    missinggroup_u = update_cols(
+        missinggroup, new_groups, ['State', 'Zip Code', 'Phone Number', 'date'])
+    
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+
+    # explanation here. match only on zip and phone
+
+    k = missinggroup[['Zip Code', 'Phone Number']].drop_duplicates().merge(groupinfo, how='left', indicator=True)
+    # k2 = k.query('_merge=="left_only"')
+    # k2 = k2.reset_index(drop=True).reset_index()
+    # k2['Group Practice PAC ID'] = (k2['index'] + 300000000000).astype('Int64')
+
+    k1 = k.query('_merge=="both"')[['Zip Code', 'Phone Number', 'Group Practice PAC ID']].drop_duplicates()
+    zip_phone_pacids = k1[~k1['Group Practice PAC ID'].duplicated(keep=False)]
+    missinggroup_u = update_cols(
+        missinggroup, zip_phone_pacids, ['Zip Code', 'Phone Number'])
+    
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+
+    # Fill in for anyone missing, where you are the same location if you
+    # have the same phone number and zip at the same date
+
+    k2 = missinggroup[['Zip Code', 'Phone Number', 'date']].dropna().drop_duplicates().reset_index(drop=True).reset_index() 
+    k2['Group Practice PAC ID'] = (k2['index'] + 300000000000).astype('Int64')
+    k2 = k2.drop(columns='index')
+    missinggroup_u = update_cols(
+        missinggroup, k2, ['Zip Code', 'Phone Number', 'date'])
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+
+    isid(missinggroup, ['NPI', 'date', 'Zip Code', 'State'])
+
+    # Finally, make up ids for nonmatches
+    k3 = missinggroup.reset_index(drop=True).reset_index()
+    k3['Group Practice PAC ID'] = (k3['index'] + 400000000000).astype('Int64')
+    k3 = k3.drop(columns='index')
+
+    missinggroup_u = update_cols(
+        missinggroup, k3, ['NPI', 'Zip Code', 'State', 'date'])
+    groupinfo1 = (missinggroup_u
+                  .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
+                  .reset_index(drop=True))
+    missinggroup = (missinggroup_u
+                    .loc[missinggroup_u['Group Practice PAC ID'].isnull()]
+                    .reset_index(drop=True))
+    groupinfo = (groupinfo.append(groupinfo1)
+                          .drop_duplicates().reset_index(drop=True))
+    missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
+    assert missinggroup.shape[0] == 0
+    return groupinfo
+
+
+
+# This npi is only in the missing group: should at least fill in zip and telephone
+# missinggroup.query('NPI=="1235197823"').sort_values(['NPI', 'date'])
+
+# # Group by all variables before making group practice indicator
+
+# df1 = isolate_consistent_info(groupinfo, idcols, 'zip9')
+# df2 = isolate_consistent_info(groupinfo, idcols, 'zip5')
+# df3 = isolate_consistent_info(groupinfo, idcols, 'Organization legal name')
+# df4 = isolate_consistent_info(groupinfo, idcols,
+#                               'Number of Group Practice members')
+# df5 = isolate_consistent_info(groupinfo, idcols, 'State')
+# df6 = isolate_consistent_info(groupinfo, idcols, 'Phone Number')
+
+# groupinfo = update_cols(groupinfo, df1, idcols)
+# groupinfo = update_cols(groupinfo, df2, idcols)
+# groupinfo = update_cols(groupinfo, df3, idcols)
+# groupinfo = update_cols(groupinfo, df4, idcols)
+# groupinfo = update_cols(groupinfo, df5, idcols)
+# groupinfo = update_cols(groupinfo, df6, idcols)
+
+# df6['Phone Number'] = df6['Phone Number'].astype(float).astype(int)
+
+# groups = groups.reset_index(drop=True).reset_index()
+# # A bunch of sole practitioners (groupsize =1 ) are missing
+# # give them a single-period group practice ID (not constant over
+# # time even though other IDs are)
+# groups.loc[
+#     groups['Group Practice PAC ID'].isnull(),
+#     'Group Practice PAC ID'] = (groups['index'] + 100000000000)
+# groups = groups.drop(columns='index')
+# groups = groups.merge(
+#     groups[['NPI', 'Group Practice PAC ID', 'date']]
+#     .drop_duplicates()
+#     .groupby(['Group Practice PAC ID', 'date'])
+#     .size()
+#     .reset_index())
+# groups.loc[
+#     groups['Number of Group Practice members'].isnull(),
+#     'Number of Group Practice members'] = groups[0]
+# groups.drop(columns=[0], inplace=True)
+
+
+def match_npi_to_groups(groupinfo):
+    npi = NPI(entities=1)
+    npi.retrieve('ploctel')
+    npi.retrieve('ploczip')
+    npi.retrieve('plocstatename')
+    npi.retrieve('practitioner_type')
+
+    s = npi.practitioner_type.set_index('npi')[['MD/DO', 'NP']].sum(axis=1) > 0
+    mds_nps = s[s].reset_index().drop(columns=0)
+    practypes = npi.practitioner_type.merge(mds_nps)[['npi', 'MD/DO', 'NP']]
+    locdata = npi.plocstatename.merge(mds_nps).merge(npi.ploczip.merge(mds_nps)).merge(npi.ploctel.merge(mds_nps)) 
+    locdata = locdata.assign(quarter=pd.PeriodIndex(locdata.month, freq='Q'))
+    locdata = locdata.drop(columns='month')
+
+    match_groups = groupinfo.assign(quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))[['Group Practice PAC ID', 'quarter', 'State', 'Phone Number', 'Zip Code']].drop_duplicates()
+    match_groups = match_groups.reset_index(drop=True)
+
+    match_groups_nophone = match_groups.loc[match_groups['Phone Number'].isnull()].drop(columns='Phone Number')
+    match_groups_phone = match_groups.loc[match_groups['Phone Number'].notnull()]
+
+    match_groups_phone = match_groups_phone[~match_groups_phone[['quarter', 'State',  'Phone Number', 'Zip Code']].duplicated(keep=False)]
+    match_groups_nophone = match_groups_nophone[~match_groups_nophone[['quarter', 'State', 'Zip Code']].duplicated(keep=False)]
+
+
+def isolate_consistent_info(df, idcols, targetcol):
+    """
+    If a column is consistent among the id variables,
+    this retrieves that info, unique at the idcols
+    level. we assume this is the master information
+    """
+    df = df[idcols + [targetcol]].drop_duplicates().dropna()
+    df = df[~df[idcols].duplicated(keep=False)]
+    isid(df, idcols)
+    return df
+
+
+def update_cols(df, update_df, idcols):
+    """
+    Fills in any missing details of a column with new information,
+    merged in on the idcols level
+    """
+    df = df.merge(update_df, on=idcols, how='left')
+    update_cols = [x for x in update_df.columns if x not in idcols]
+    for col in update_cols:
+        df[col] = df[f'{col}_x'].fillna(df[f'{col}_y'])
+        df = df.drop(columns=[f'{col}_x', f'{col}_y'])
+    return df
