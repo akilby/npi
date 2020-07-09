@@ -364,7 +364,11 @@ def group_practices_infer():
     missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
 
     # Make some new groupnos for unmatched sole proprietors
-    m = missinggroup[missinggroup['Number of Group Practice members'] == 1][['NPI','Zip Code','State']].drop_duplicates().reset_index(drop=True).reset_index() 
+    m = missinggroup[missinggroup['Number of Group Practice members'] == 1]
+    m = (m[['NPI', 'Zip Code', 'State']]
+         .drop_duplicates()
+         .reset_index(drop=True)
+         .reset_index())
     m['Group Practice PAC ID'] = (m['index'] + 200000000000).astype('Int64')
     missinggroup_u = update_cols(
         missinggroup, m.drop(columns='index'), ['NPI', 'State', 'Zip Code'])
@@ -379,12 +383,15 @@ def group_practices_infer():
                           .drop_duplicates().reset_index(drop=True))
     missinggroup = missinggroup.drop_duplicates().reset_index(drop=True)
 
-    m = missinggroup[['State', 'Zip Code', 'Phone Number', 'date']].drop_duplicates().merge(groupinfo[['State', 'Zip Code', 'Phone Number', 'date', 'Group Practice PAC ID']].drop_duplicates()) 
+    ids = ['State', 'Zip Code', 'Phone Number', 'date']
+    m = (missinggroup[ids]
+         .drop_duplicates()
+         .merge(groupinfo[ids + ['Group Practice PAC ID']].drop_duplicates()))
 
-    new_groups = m[~m[['State', 'Zip Code', 'Phone Number', 'date']].duplicated(keep=False)] 
+    new_groups = m[~m[ids].duplicated(keep=False)]
     missinggroup_u = update_cols(
-        missinggroup, new_groups, ['State', 'Zip Code', 'Phone Number', 'date'])
-    
+        missinggroup, new_groups, ids)
+
     groupinfo1 = (missinggroup_u
                   .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
                   .reset_index(drop=True))
@@ -398,16 +405,21 @@ def group_practices_infer():
 
     # explanation here. match only on zip and phone
 
-    k = missinggroup[['Zip Code', 'Phone Number']].drop_duplicates().merge(groupinfo, how='left', indicator=True)
+    k = (missinggroup[['Zip Code', 'Phone Number']]
+         .drop_duplicates()
+         .merge(groupinfo, how='left', indicator=True))
     # k2 = k.query('_merge=="left_only"')
     # k2 = k2.reset_index(drop=True).reset_index()
-    # k2['Group Practice PAC ID'] = (k2['index'] + 300000000000).astype('Int64')
+    # k2['Group Practice PAC ID'] = (
+    #   k2['index'] + 300000000000).astype('Int64'))
 
-    k1 = k.query('_merge=="both"')[['Zip Code', 'Phone Number', 'Group Practice PAC ID']].drop_duplicates()
+    ids = ['Zip Code', 'Phone Number']
+    k1 = (k.query('_merge=="both"')[ids + ['Group Practice PAC ID']]
+           .drop_duplicates())
     zip_phone_pacids = k1[~k1['Group Practice PAC ID'].duplicated(keep=False)]
     missinggroup_u = update_cols(
-        missinggroup, zip_phone_pacids, ['Zip Code', 'Phone Number'])
-    
+        missinggroup, zip_phone_pacids, ids)
+
     groupinfo1 = (missinggroup_u
                   .loc[missinggroup_u['Group Practice PAC ID'].notnull()]
                   .reset_index(drop=True))
@@ -422,7 +434,10 @@ def group_practices_infer():
     # Fill in for anyone missing, where you are the same location if you
     # have the same phone number and zip at the same date
 
-    k2 = missinggroup[['Zip Code', 'Phone Number', 'date']].dropna().drop_duplicates().reset_index(drop=True).reset_index() 
+    k2 = (missinggroup[['Zip Code', 'Phone Number', 'date']]
+          .dropna()
+          .drop_duplicates()
+          .reset_index(drop=True).reset_index())
     k2['Group Practice PAC ID'] = (k2['index'] + 300000000000).astype('Int64')
     k2 = k2.drop(columns='index')
     missinggroup_u = update_cols(
@@ -502,7 +517,13 @@ def group_practices_infer():
 # groups.drop(columns=[0], inplace=True)
 
 
-def match_npi_to_groups(groupinfo):
+def match_npi_to_groups():
+    from .utils.globalcache import c
+    from project_management.helper import hash_retrieve
+
+    groupinfo = c.group_practices_infer()
+    groupinfo = hash_retrieve('2254943319023394300')
+
     npi = NPI(entities=1)
     npi.retrieve('ploctel')
     npi.retrieve('ploczip')
@@ -512,9 +533,14 @@ def match_npi_to_groups(groupinfo):
     s = npi.practitioner_type.set_index('npi')[['MD/DO', 'NP']].sum(axis=1) > 0
     mds_nps = s[s].reset_index().drop(columns=0)
     practypes = npi.practitioner_type.merge(mds_nps)[['npi', 'MD/DO', 'NP']]
-    locdata = npi.plocstatename.merge(mds_nps).merge(npi.ploczip.merge(mds_nps)).merge(npi.ploctel.merge(mds_nps)) 
+    locdata = (npi.plocstatename
+               .merge(mds_nps)
+               .merge(npi.ploczip.merge(mds_nps))
+               .merge(npi.ploctel.merge(mds_nps)))
     locdata = locdata.assign(quarter=pd.PeriodIndex(locdata.month, freq='Q'))
     locdata = locdata.drop(columns='month')
+    locdata = locdata.drop_duplicates()
+    locdata.query('quarter>="2013Q1" and quarter<="2019Q4"')
 
     match_groups = groupinfo.assign(quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))[['Group Practice PAC ID', 'quarter', 'State', 'Phone Number', 'Zip Code']].drop_duplicates()
     match_groups = match_groups.reset_index(drop=True)
