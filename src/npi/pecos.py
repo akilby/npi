@@ -691,24 +691,29 @@ def match_npi_to_groups(locdata, group_practices_npi):
     return full_groups
 
 
+def count_nps_for_mds_q(full_groups_ids, q):
+    return (full_groups_ids
+            .loc[(full_groups_ids['MD/DO'] == 1)
+                 & (full_groups_ids.quarter == q)]
+            .drop(columns=['MD/DO', 'NP'])
+            .merge(full_groups_ids.loc[(full_groups_ids['NP'] == 1)
+                                       & (full_groups_ids.quarter
+                                          == q)],
+                   on=['quarter', 'group_quarter_loc_id'])
+            [['npi_x', 'npi_y', 'quarter']]
+            .drop_duplicates()
+            .groupby(['npi_x', 'quarter']).size())
+
+
 def count_nps_for_mds(locdata, full_groups, practypes):
+    from .utils.globalcache import c
     full_groups_ids = (full_groups[['npi', 'quarter', 'group_quarter_loc_id']]
                        .drop_duplicates()
                        .merge(practypes))
 
     # count all practitioners, nps, mds
     quarters = sorted(locdata.quarter.value_counts().index)
-    npc = pd.concat([(full_groups_ids
-                      .loc[(full_groups_ids['MD/DO'] == 1)
-                           & (full_groups_ids.quarter == q)]
-                      .drop(columns=['MD/DO', 'NP'])
-                      .merge(full_groups_ids.loc[(full_groups_ids['NP'] == 1)
-                                                 & (full_groups_ids.quarter
-                                                    == q)],
-                             on=['quarter', 'group_quarter_loc_id'])
-                      [['npi_x', 'npi_y', 'quarter']]
-                      .drop_duplicates()
-                      .groupby(['npi_x', 'quarter']).size()) 
+    npc = pd.concat([c.count_nps_for_mds_q(full_groups_ids, q)
                      for q in quarters])
     npc_all = (locdata
                .merge(practypes.loc[practypes['MD/DO'] == 1])
@@ -728,6 +733,7 @@ def count_nps_for_mds_master():
     full_groups = c.match_npi_to_groups(locdata, group_practices_npi)
     npcs = c.count_nps_for_mds(locdata, full_groups, practypes)
     return npcs
+
 
     # locdata_phone = locdata.loc[locdata.ploctel.notnull()]
     # locdata_nophone = locdata.loc[locdata.ploctel.isnull()]
