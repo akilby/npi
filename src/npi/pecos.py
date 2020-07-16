@@ -522,13 +522,17 @@ def make_master_enrollee_dataframe(enrollee_subset,
     npi.retrieve('ploczip')
     npi.retrieve('plocstatename')
 
-    npi['ploctel'] = (npi.ploctel
-                         .astype('str')
-                         .str.split('.', expand=True)[0])
-    npi['ploctel'] = (npi.ploctel.str.replace('-', '')
-                                 .str.replace('(', '')
-                                 .str.replace(')', '')
-                                 .str.replace(' ', ''))
+    # npi.ploctel['ploctel'] = (npi
+    #                           .ploctel
+    #                           .ploctel
+    #                           .astype('str')
+    #                           .str.split('.', expand=True)[0])
+    # npi.ploctel['ploctel'] = (npi.ploctel
+    #                              .ploctel
+    #                              .str.replace('-', '')
+    #                              .str.replace('(', '')
+    #                              .str.replace(')', '')
+    #                              .str.replace(' ', ''))
     # Get locations at the enrollee-quarter level. Can be duplicates at the
     # enrollee quarter. Also, drop prior to 2013 and after 2019
     locdata = (npi.plocstatename
