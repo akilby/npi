@@ -522,7 +522,7 @@ def match_npi_to_groups():
     from project_management.helper import hash_retrieve
 
     groupinfo = c.group_practices_infer()
-    groupinfo = hash_retrieve('2254943319023394300')
+    # groupinfo = hash_retrieve('2254943319023394300')
 
     npi = NPI(entities=1)
     npi.retrieve('ploctel')
@@ -530,26 +530,79 @@ def match_npi_to_groups():
     npi.retrieve('plocstatename')
     npi.retrieve('practitioner_type')
 
+    # get about 1.5 million MDs and NPs
     s = npi.practitioner_type.set_index('npi')[['MD/DO', 'NP']].sum(axis=1) > 0
     mds_nps = s[s].reset_index().drop(columns=0)
     practypes = npi.practitioner_type.merge(mds_nps)[['npi', 'MD/DO', 'NP']]
+
+    # Get locations at the enrollee-quarter level. Can be duplicates at the
+    # enrollee quarter. Also, drop prior to 2013 and after 2019
     locdata = (npi.plocstatename
                .merge(mds_nps)
                .merge(npi.ploczip.merge(mds_nps))
                .merge(npi.ploctel.merge(mds_nps)))
     locdata = locdata.assign(quarter=pd.PeriodIndex(locdata.month, freq='Q'))
+    locdata = locdata.loc[locdata.quarter
+                          >= pd.to_datetime('2013-01-01').to_period(freq='Q')]
+    locdata = locdata.loc[locdata.quarter
+                          < pd.to_datetime('2020-01-01').to_period(freq='Q')]
     locdata = locdata.drop(columns='month')
     locdata = locdata.drop_duplicates()
-    locdata.query('quarter>="2013Q1" and quarter<="2019Q4"')
+    # locdata_phone = locdata.loc[locdata.ploctel.notnull()]
+    # locdata_nophone = locdata.loc[locdata.ploctel.isnull()]
 
-    match_groups = groupinfo.assign(quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))[['Group Practice PAC ID', 'quarter', 'State', 'Phone Number', 'Zip Code']].drop_duplicates()
+    # Groupinfo is from the laborious process to assign practice groups, above
+    # get state, phone, zip for each group-quarter
+    # Group ids can stay constant across quarters but don't necessarily
+    match_groups = groupinfo.assign(
+        quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))
+    match_groups = match_groups[['Group Practice PAC ID', 'quarter', 'State',
+                                 'Phone Number', 'Zip Code']].drop_duplicates()
     match_groups = match_groups.reset_index(drop=True)
 
-    match_groups_nophone = match_groups.loc[match_groups['Phone Number'].isnull()].drop(columns='Phone Number')
-    match_groups_phone = match_groups.loc[match_groups['Phone Number'].notnull()]
+    match_groups_nophone = (match_groups
+                            .loc[match_groups['Phone Number'].isnull()]
+                            .drop(columns='Phone Number'))
+    match_groups_phone = (match_groups
+                          .loc[match_groups['Phone Number'].notnull()])
 
-    match_groups_phone = match_groups_phone[~match_groups_phone[['quarter', 'State',  'Phone Number', 'Zip Code']].duplicated(keep=False)]
-    match_groups_nophone = match_groups_nophone[~match_groups_nophone[['quarter', 'State', 'Zip Code']].duplicated(keep=False)]
+    id1 = ['quarter', 'State',  'Phone Number', 'Zip Code']
+    id2 = ['quarter', 'State', 'Zip Code']
+    match_groups_phone = match_groups_phone[~match_groups_phone[id1]
+                                            .duplicated(keep=False)]
+    match_groups_nophone = match_groups_nophone[~match_groups_nophone[id2]
+                                                .duplicated(keep=False)]
+
+    # match_groups_npi keeps the group information at the npi - quarter level
+    match_groups_NPI = groupinfo.assign(
+        quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))
+    match_groups_NPI = match_groups_NPI[['NPI', 'Group Practice PAC ID',
+                                         'quarter', 'State', 'Phone Number',
+                                         'Zip Code']].drop_duplicates()
+    match_groups_NPI = (match_groups_NPI
+                        .rename(columns={'NPI': 'npi'}).reset_index(drop=True))
+
+    # want to append the group practices from nearby quarters, to make
+    #  a full panel for matching at the npi-quarter level
+    group_practices_npi = match_groups_NPI[['npi', 'quarter', 'Group Practice PAC ID']].drop_duplicates()
+
+    add1 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2013-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2013-01-01').to_period(freq='Q'))
+    add2 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2015-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2015-01-01').to_period(freq='Q'))
+    add3 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2016-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2016-01-01').to_period(freq='Q'))
+    add4 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2017-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2017-01-01').to_period(freq='Q'))
+    add5 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2019-10-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2019-07-01').to_period(freq='Q'))
+    group_practices_npi = pd.concat([group_practices_npi, add1, add2, add3, add4, add5])
+    group_practices_npi = group_practices_npi.loc[group_practices_npi.quarter
+                                                  < (pd
+                                                     .to_datetime('2020-01-01')
+                                                     .to_period(freq='Q'))]
+    group_practices_npi = group_practices_npi.reset_index(drop=True)
+    # Why is this necessary
+    group_practices_npi = group_practices_npi.assign(quarter=group_practices_npi.quarter.astype('period[Q-DEC]'))
+
+    match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State'])
+    m.query('_merge=="left_only"').drop(columns='Group Practice PAC ID').merge(match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State']))
+
 
 
 def isolate_consistent_info(df, idcols, targetcol):

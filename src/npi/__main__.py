@@ -59,6 +59,10 @@ class CommandLine(object):
             '--exclude', required=False, nargs='+',
             default=[],
             help='exclude some variables')
+        parser_process.add_argument(
+            '--include', required=False, nargs='+',
+            default=[],
+            help='include only these variables')
 
     def download(self, args):
         if args.source.upper() == 'NPPES':
@@ -70,7 +74,8 @@ class CommandLine(object):
                 main_process_variable(args.variable, args.update)
             else:
                 print('updating all variables except', args.exclude)
-                update_all(max_jobs=args.max_jobs, exclude=args.exclude)
+                update_all(max_jobs=args.max_jobs, exclude=args.exclude,
+                           include=args.include)
 
 
 def main():
