@@ -473,8 +473,6 @@ def group_practices_infer():
     assert missinggroup.shape[0] == 0
     return groupinfo
 
-
-
 # This npi is only in the missing group: should at least fill in zip and telephone
 # missinggroup.query('NPI=="1235197823"').sort_values(['NPI', 'date'])
 
@@ -517,63 +515,49 @@ def group_practices_infer():
 # groups.drop(columns=[0], inplace=True)
 
 
-def match_npi_to_groups():
-    from .utils.globalcache import c
-    from project_management.helper import hash_retrieve
-
-    groupinfo = c.group_practices_infer()
-    # groupinfo = hash_retrieve('2254943319023394300')
-
+def make_master_enrollee_dataframe(enrollee_subset,
+                                   start='2013-01-01', end='2020-01-01'):
     npi = NPI(entities=1)
     npi.retrieve('ploctel')
     npi.retrieve('ploczip')
     npi.retrieve('plocstatename')
-    npi.retrieve('practitioner_type')
 
+    npi['ploctel'] = (npi.ploctel
+                         .astype('str')
+                         .str.split('.', expand=True)[0])
+    npi['ploctel'] = (npi.ploctel.str.replace('-', '')
+                                 .str.replace('(', '')
+                                 .str.replace(')', '')
+                                 .str.replace(' ', ''))
+    # Get locations at the enrollee-quarter level. Can be duplicates at the
+    # enrollee quarter. Also, drop prior to 2013 and after 2019
+    locdata = (npi.plocstatename
+               .merge(enrollee_subset)
+               .merge(npi.ploczip.merge(enrollee_subset))
+               .merge(npi.ploctel.merge(enrollee_subset)))
+    locdata = locdata.assign(quarter=pd.PeriodIndex(locdata.month, freq='Q'))
+    locdata = locdata.loc[locdata.quarter
+                          >= pd.to_datetime(start).to_period(freq='Q')]
+    locdata = locdata.loc[locdata.quarter
+                          < pd.to_datetime(end).to_period(freq='Q')]
+    locdata = locdata.drop(columns='month')
+    locdata = locdata.drop_duplicates()
+    return locdata
+
+
+def get_mds_nps_info():
+    npi = NPI(entities=1)
+    npi.retrieve('practitioner_type')
     # get about 1.5 million MDs and NPs
     s = npi.practitioner_type.set_index('npi')[['MD/DO', 'NP']].sum(axis=1) > 0
     mds_nps = s[s].reset_index().drop(columns=0)
     practypes = npi.practitioner_type.merge(mds_nps)[['npi', 'MD/DO', 'NP']]
+    return mds_nps, practypes
 
-    # Get locations at the enrollee-quarter level. Can be duplicates at the
-    # enrollee quarter. Also, drop prior to 2013 and after 2019
-    locdata = (npi.plocstatename
-               .merge(mds_nps)
-               .merge(npi.ploczip.merge(mds_nps))
-               .merge(npi.ploctel.merge(mds_nps)))
-    locdata = locdata.assign(quarter=pd.PeriodIndex(locdata.month, freq='Q'))
-    locdata = locdata.loc[locdata.quarter
-                          >= pd.to_datetime('2013-01-01').to_period(freq='Q')]
-    locdata = locdata.loc[locdata.quarter
-                          < pd.to_datetime('2020-01-01').to_period(freq='Q')]
-    locdata = locdata.drop(columns='month')
-    locdata = locdata.drop_duplicates()
-    # locdata_phone = locdata.loc[locdata.ploctel.notnull()]
-    # locdata_nophone = locdata.loc[locdata.ploctel.isnull()]
 
-    # Groupinfo is from the laborious process to assign practice groups, above
-    # get state, phone, zip for each group-quarter
-    # Group ids can stay constant across quarters but don't necessarily
-    match_groups = groupinfo.assign(
-        quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))
-    match_groups = match_groups[['Group Practice PAC ID', 'quarter', 'State',
-                                 'Phone Number', 'Zip Code']].drop_duplicates()
-    match_groups = match_groups.reset_index(drop=True)
+def make_master_group_practice_dataframe(groupinfo,
+                                         start='2013-01-01', end='2020-01-01'):
 
-    match_groups_nophone = (match_groups
-                            .loc[match_groups['Phone Number'].isnull()]
-                            .drop(columns='Phone Number'))
-    match_groups_phone = (match_groups
-                          .loc[match_groups['Phone Number'].notnull()])
-
-    id1 = ['quarter', 'State',  'Phone Number', 'Zip Code']
-    id2 = ['quarter', 'State', 'Zip Code']
-    match_groups_phone = match_groups_phone[~match_groups_phone[id1]
-                                            .duplicated(keep=False)]
-    match_groups_nophone = match_groups_nophone[~match_groups_nophone[id2]
-                                                .duplicated(keep=False)]
-
-    # match_groups_npi keeps the group information at the npi - quarter level
     match_groups_NPI = groupinfo.assign(
         quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))
     match_groups_NPI = match_groups_NPI[['NPI', 'Group Practice PAC ID',
@@ -584,24 +568,211 @@ def match_npi_to_groups():
 
     # want to append the group practices from nearby quarters, to make
     #  a full panel for matching at the npi-quarter level
-    group_practices_npi = match_groups_NPI[['npi', 'quarter', 'Group Practice PAC ID']].drop_duplicates()
+    group_practices_npi = (match_groups_NPI[['npi', 'quarter',
+                                             'Group Practice PAC ID',
+                                             'State', 'Phone Number',
+                                             'Zip Code']]
+                           .drop_duplicates())
 
-    add1 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2013-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2013-01-01').to_period(freq='Q'))
-    add2 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2015-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2015-01-01').to_period(freq='Q'))
-    add3 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2016-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2016-01-01').to_period(freq='Q'))
-    add4 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2017-04-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2017-01-01').to_period(freq='Q'))
-    add5 = group_practices_npi.loc[group_practices_npi.quarter == pd.to_datetime('2019-10-01').to_period(freq='Q')].assign(quarter=pd.to_datetime('2019-07-01').to_period(freq='Q'))
-    group_practices_npi = pd.concat([group_practices_npi, add1, add2, add3, add4, add5])
+    timeperiods = [('2013-04-01', '2013-01-01'),
+                   ('2015-04-01', '2015-01-01'),
+                   ('2016-04-01', '2016-01-01'),
+                   ('2017-04-01', '2017-01-01'),
+                   ('2019-10-01', '2019-07-01')]
+
+    addlist = [(group_practices_npi
+                .loc[group_practices_npi.quarter
+                     == pd.to_datetime(t[0]).to_period(freq='Q')]
+                .assign(quarter=pd.to_datetime(t[1]).to_period(freq='Q')))
+               for t in timeperiods]
+
+    group_practices_npi = pd.concat([group_practices_npi] + addlist)
+    group_practices_npi = group_practices_npi.loc[group_practices_npi.quarter
+                                                  >= (pd
+                                                      .to_datetime(start)
+                                                      .to_period(freq='Q'))]
     group_practices_npi = group_practices_npi.loc[group_practices_npi.quarter
                                                   < (pd
-                                                     .to_datetime('2020-01-01')
+                                                     .to_datetime(end)
                                                      .to_period(freq='Q'))]
     group_practices_npi = group_practices_npi.reset_index(drop=True)
     # Why is this necessary
-    group_practices_npi = group_practices_npi.assign(quarter=group_practices_npi.quarter.astype('period[Q-DEC]'))
+    group_practices_npi = group_practices_npi.assign(
+        quarter=group_practices_npi.quarter.astype('period[Q-DEC]'))
+    return group_practices_npi
 
-    match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State'])
-    m.query('_merge=="left_only"').drop(columns='Group Practice PAC ID').merge(match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State']))
+
+def match_npi_to_groups(locdata, group_practices_npi):
+
+    # Merge the NPPES data to the group practice data, merging on npi-quarter
+    already_have_group = locdata.merge(group_practices_npi)
+    # Note: this converts missing telephones to string "nan"
+    already_have_group = (already_have_group[['npi', 'quarter',
+                                              'plocstatename', 'ploctel',
+                                              'ploczip',
+                                              'Group Practice PAC ID']]
+                          .rename(columns={'plocstatename': 'state',
+                                           'ploctel': 'telephone',
+                                           'ploczip': 'zip'})
+                          .assign(telephone=lambda x: (x['telephone']
+                                                       .astype(str)
+                                                       .str.split('.')
+                                                       .str[0]))
+                          .append(already_have_group[['npi', 'quarter',
+                                                      'State', 'Phone Number',
+                                                      'Zip Code',
+                                                      'Group Practice PAC ID']]
+                                  .rename(columns={'State': 'state',
+                                                   'Phone Number': 'telephone',
+                                                   'Zip Code': 'zip'})
+                                  .assign(telephone=lambda x: (x['telephone']
+                                                               .astype(str)
+                                                               .str
+                                                               .split('.')
+                                                               .str[0]))
+                                  )
+                          .drop_duplicates())
+
+    npi_location_nums = (locdata.groupby(['plocstatename', 'ploczip',
+                                          'ploctel', 'quarter'])
+                                .size()
+                                .reset_index()
+                                .reset_index()
+                                .assign(npi_group_id=lambda df: df['index']
+                                        + 900000000000))
+    groups_combined = (npi_location_nums
+                       .drop(columns='index')
+                       .rename(columns={'plocstatename': 'state',
+                                        'ploctel': 'telephone',
+                                        'ploczip': 'zip'})
+                       .merge(already_have_group, how='left', indicator=True))
+    groups_combined.loc[groups_combined._merge == 'left_only',
+                        'group_id'] = groups_combined.npi_group_id
+    groups_combined.loc[groups_combined._merge == 'both',
+                        'group_id'] = groups_combined['Group Practice PAC ID']
+    groups_combined['group_id'] = groups_combined.group_id.astype(int)
+
+    missing_group = (locdata.merge(already_have_group[['npi', 'quarter']]
+                     .drop_duplicates(), how='left', indicator=True)
+                     .query('_merge=="left_only"')
+                     .drop(columns='_merge')
+                     .assign(telephone=lambda x:
+                             (x['ploctel'].astype(str).str.split('.').str[0]))
+                     .drop(columns='ploctel'))
+
+    # This will add groups for everyone but a small number of people missing
+    # zip, state, or tel in the
+    # NPPES
+    add_groups = (missing_group
+                  .rename(columns={'plocstatename': 'state',
+                                   'ploczip': 'zip'})
+                  .merge(groups_combined
+                         .drop(columns=['npi', 0, 'npi_group_id',
+                                        'Group Practice PAC ID', '_merge'])
+                         .drop_duplicates()))
+
+    full_groups = (already_have_group
+                   .rename(columns={'Group Practice PAC ID': 'group_id'})
+                   .append(add_groups)
+                   .drop_duplicates())
+    full_groups['group_quarter_loc_id'] = (full_groups['group_id'].astype(str)
+                                           + '-'
+                                           + full_groups['quarter'].astype(str)
+                                           + '-'
+                                           + full_groups['state']
+                                           + '-'
+                                           + full_groups['zip'].astype(str)
+                                           + '-'
+                                           + full_groups['telephone'])
+    return full_groups
+
+
+def count_nps_for_mds(locdata, full_groups, practypes):
+    full_groups_ids = (full_groups[['npi', 'quarter', 'group_quarter_loc_id']]
+                       .drop_duplicates()
+                       .merge(practypes))
+
+    # count all practitioners, nps, mds
+    quarters = sorted(locdata.quarter.value_counts().index)
+    npc = pd.concat([(full_groups_ids
+                      .loc[(full_groups_ids['MD/DO'] == 1)
+                           & (full_groups_ids.quarter == q)]
+                      .drop(columns=['MD/DO', 'NP'])
+                      .merge(full_groups_ids.loc[(full_groups_ids['NP'] == 1)
+                                                 & (full_groups_ids.quarter
+                                                    == q)],
+                             on=['quarter', 'group_quarter_loc_id'])
+                      [['npi_x', 'npi_y', 'quarter']]
+                      .drop_duplicates()
+                      .groupby(['npi_x', 'quarter']).size()) 
+                     for q in quarters])
+    npc_all = (locdata
+               .merge(practypes.loc[practypes['MD/DO'] == 1])
+               .merge(npc.reset_index().rename(
+                columns={'npi_x': 'npi', 0: 'npcount'})))
+    return npc_all[['npi', 'quarter', 'npcount']]
+
+
+def count_nps_for_mds_master():
+    from .utils.globalcache import c
+    mds_nps, practypes = c.get_mds_nps_info()
+    locdata = c.make_master_enrollee_dataframe(mds_nps)
+    # from project_management.helper import hash_retrieve
+    # groupinfo = hash_retrieve('2254943319023394300')
+    groupinfo = c.group_practices_infer()
+    group_practices_npi = c.make_master_group_practice_dataframe(groupinfo)
+    full_groups = c.match_npi_to_groups(locdata, group_practices_npi)
+    npcs = c.count_nps_for_mds(locdata, full_groups, practypes)
+    return npcs
+
+    # locdata_phone = locdata.loc[locdata.ploctel.notnull()]
+    # locdata_nophone = locdata.loc[locdata.ploctel.isnull()]
+
+    # Groupinfo is from the laborious process to assign practice groups, above
+    # get state, phone, zip for each group-quarter
+    # Group ids can stay constant across quarters but don't necessarily
+#    match_groups = groupinfo.assign(
+#        quarter=pd.PeriodIndex(groupinfo.date, freq='Q'))
+#    match_groups = match_groups[['Group Practice PAC ID', 'quarter', 'State',
+#                                 'Phone Number', 'Zip Code']].drop_duplicates()
+#    match_groups = match_groups.reset_index(drop=True)
+#
+#    match_groups_nophone = (match_groups
+#                            .loc[match_groups['Phone Number'].isnull()]
+#                            .drop(columns='Phone Number'))
+#    match_groups_phone = (match_groups
+#                          .loc[match_groups['Phone Number'].notnull()])
+#
+#    id1 = ['quarter', 'State',  'Phone Number', 'Zip Code']
+#    id2 = ['quarter', 'State', 'Zip Code']
+#    match_groups_phone = match_groups_phone[~match_groups_phone[id1]
+#                                            .duplicated(keep=False)]
+#    match_groups_nophone = match_groups_nophone[~match_groups_nophone[id2]
+#                                                .duplicated(keep=False)]
+
+    # match_groups_npi keeps the group information at the npi - quarter level
+
+    # prelim_matches = (missing_group.rename(columns={'plocstatename': 'state',
+    #                                                 'ploctel': 'telephone',
+    #                                                 'ploczip': 'zip'})
+    #                                .assign(telephone=lambda x: (x['telephone']
+    #                                                             .astype(str)
+    #                                                             .str.split('.')
+    #                                                             .str[0]))
+    #                                .merge(already_have_group,
+    #                                       on=[x for x in
+    #                                           already_have_group.columns
+    #                                           if x not in
+    #                                           ['npi',
+    #                                            'Group Practice PAC ID']],
+    #                                       how='left', indicator=True))
+# 
+# 
+# 
+    # missing_group.merge(prelim_matches[['npi_x','quarter']].rename(columns={'npi_x': 'npi'}).drop_duplicates(), how='left', indicator=True) 
+# 
+    # match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State'])
+    # m.query('_merge=="left_only"').drop(columns='Group Practice PAC ID').merge(match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State']))
 
 
 
