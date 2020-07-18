@@ -691,30 +691,23 @@ def match_npi_to_groups(locdata, group_practices_npi):
     return full_groups
 
 
-def count_nps_for_mds_q(full_groups_ids, q):
-    return (full_groups_ids
-            .loc[(full_groups_ids['MD/DO'] == 1)
-                 & (full_groups_ids.quarter == q)]
+def count_nps_for_mds_q(full_groups_ids_q):
+    return (full_groups_ids_q
+            .loc[full_groups_ids_q['MD/DO'] == 1]
             .drop(columns=['MD/DO', 'NP'])
-            .merge(full_groups_ids.loc[(full_groups_ids['NP'] == 1)
-                                       & (full_groups_ids.quarter
-                                          == q)],
+            .merge(full_groups_ids_q.loc[full_groups_ids_q['NP'] == 1],
                    on=['quarter', 'group_quarter_loc_id'])
             [['npi_x', 'npi_y', 'quarter']]
             .drop_duplicates()
             .groupby(['npi_x', 'quarter']).size())
 
 
-def count_nps_for_mds(locdata, full_groups, practypes):
+def count_nps_for_mds(locdata, full_groups_ids, practypes):
     from .utils.globalcache import c
-    full_groups_ids = (full_groups[['npi', 'quarter', 'group_quarter_loc_id']]
-                       .drop_duplicates()
-                       .merge(practypes))
-
-    # count all practitioners, nps, mds
     quarters = sorted(locdata.quarter.value_counts().index)
-    npc = pd.concat([c.count_nps_for_mds_q(full_groups_ids, q)
-                     for q in quarters])
+    npc = pd.concat(
+        [c.count_nps_for_mds_q(full_groups_ids[full_groups_ids.quarter == q])
+         for q in quarters])
     npc_all = (locdata
                .merge(practypes.loc[practypes['MD/DO'] == 1])
                .merge(npc.reset_index().rename(
@@ -731,7 +724,11 @@ def count_nps_for_mds_master():
     groupinfo = c.group_practices_infer()
     group_practices_npi = c.make_master_group_practice_dataframe(groupinfo)
     full_groups = c.match_npi_to_groups(locdata, group_practices_npi)
-    npcs = c.count_nps_for_mds(locdata, full_groups, practypes)
+    full_groups_ids = (full_groups[['npi', 'quarter', 'group_quarter_loc_id']]
+                       .drop_duplicates()
+                       .merge(practypes))
+    npcs = c.count_nps_for_mds(
+        locdata[['npi', 'quarter']], full_groups_ids, practypes)
     return npcs
 
 
