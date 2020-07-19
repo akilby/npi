@@ -99,6 +99,63 @@ class PECOS(object):
         self.practitioner_type = (pc3.merge(
             pc[['NPI', 'Primary specialty']].drop_duplicates(), how='right'))
 
+    def fix_zips(self):
+        from .utils.globalcache import c
+        pecos = self.physician_compare[['Zip Code', 'State',
+                                        'Group Practice PAC ID']]
+        self.physician_compare = self.physician_compare.assign(
+            **{'Zip Code': c.fix_pecos_zips(pecos)})
+
+
+def fix_pecos_zips(pecos):
+    # Fix misshapen zip codes - 8s and 4s in states that have 0 prefixes
+    zip0_states = ['CT', 'MA', 'ME', 'NH', 'NJ', 'PR', 'RI', 'VT', 'VI']
+    pecos = pecos.assign(**{'Zip Code': np.where(
+        ((pecos['Zip Code'].str.len() == 8) |
+            (pecos['Zip Code'].str.len() == 4))
+        & (pecos.State.isin(zip0_states)),
+        '0' + pecos['Zip Code'], pecos['Zip Code'])})
+
+    # Fix misshapen zip codes - double zeros
+    busted_zips = (pecos[
+        (pecos['Zip Code'].str.len() != 9)
+        & (pecos['Zip Code'].str.len() != 5)]
+        ['Group Practice PAC ID'].drop_duplicates().dropna())
+    z = (pecos
+         .merge(busted_zips)
+         .groupby(['Group Practice PAC ID', 'Zip Code'])
+         .size())
+    zip_crosswalk = (z.reset_index()
+                     [z.reset_index()['Zip Code'].str.len() == 3]
+                     .drop(columns=0)
+                     .assign(zip2=lambda df: '00' + df['Zip Code'])
+                     .merge(z.reset_index().drop(columns=0),
+                            left_on=['Group Practice PAC ID', 'zip2'],
+                            right_on=['Group Practice PAC ID', 'Zip Code'])
+                     .append(z.reset_index()
+                             [z.reset_index()['Zip Code'].str.len() == 7]
+                             .drop(columns=0)
+                             .assign(zip2=lambda df: '00' + df['Zip Code'])
+                             .merge(z.reset_index().drop(columns=0),
+                                    left_on=['Group Practice PAC ID', 'zip2'],
+                                    right_on=['Group Practice PAC ID',
+                                              'Zip Code']))
+                     .drop(columns='zip2')
+                     .rename(columns={'Zip Code_x': 'Zip Code'})
+                     .assign(**{
+                        'Group Practice PAC ID':
+                        lambda df: df['Group Practice PAC ID'].astype('Int64')}
+                        ))
+    pecos = (pecos.merge(zip_crosswalk, how='left', indicator=True))
+    pecos.loc[(
+        pecos._merge == "both"),
+        'Zip Code'] = pecos['Zip Code_y']
+
+    pecos = (pecos.drop(columns=['_merge', 'Zip Code_y']))
+    return pecos['Zip Code']
+
+
+
 
 def medicare_program_engagement():
     """
@@ -205,6 +262,8 @@ def group_practices_infer():
                               'Number of Group Practice members',
                               'State', 'Zip Code', 'Phone Number'],
                              drop_duplicates=False, date_var=True)
+    pecos_groups_loc.fix_zips()
+    # FIX ZIPs
 
     # Groups can change over time so start with groups
     # with same dets over time
@@ -712,15 +771,23 @@ def count_nps_for_mds(locdata, full_groups_ids, practypes):
                .merge(practypes.loc[practypes['MD/DO'] == 1])
                .merge(npc.reset_index().rename(
                 columns={'npi_x': 'npi', 0: 'npcount'})))
-    return npc_all[['npi', 'quarter', 'npcount']]
+    npc_all = (locdata.merge(practypes.loc[practypes['MD/DO'] == 1])
+               .merge(npc
+                      .reset_index()
+                      .rename(columns={'npi_x': 'npi', 0: 'npcount'}),
+                      how='left')
+               .drop(columns=['MD/DO', 'NP'])
+               .fillna(0)
+               .sort_values(['npi', 'quarter'])
+               .reset_index(drop=True)
+               .assign(npcount=lambda df: df.npcount.astype(int)))
+    return npc_all
 
 
 def count_nps_for_mds_master():
     from .utils.globalcache import c
     mds_nps, practypes = c.get_mds_nps_info()
     locdata = c.make_master_enrollee_dataframe(mds_nps)
-    # from project_management.helper import hash_retrieve
-    # groupinfo = hash_retrieve('2254943319023394300')
     groupinfo = c.group_practices_infer()
     group_practices_npi = c.make_master_group_practice_dataframe(groupinfo)
     full_groups = c.match_npi_to_groups(locdata, group_practices_npi)
@@ -728,8 +795,12 @@ def count_nps_for_mds_master():
                        .drop_duplicates()
                        .merge(practypes))
     npcs = c.count_nps_for_mds(
-        locdata[['npi', 'quarter']], full_groups_ids, practypes)
+        locdata[['npi', 'quarter']].drop_duplicates(),
+        full_groups_ids, practypes)
     return npcs
+
+    # from project_management.helper import hash_retrieve
+    # groupinfo = hash_retrieve('2254943319023394300')
 
 
     # locdata_phone = locdata.loc[locdata.ploctel.notnull()]
