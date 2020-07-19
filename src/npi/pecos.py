@@ -107,6 +107,15 @@ class PECOS(object):
             **{'Zip Code': c.fix_pecos_zips(pecos).astype('string')
                })
 
+    def fix_phones(self):
+        from .utils.globalcache import c
+        pecos = self.physician_compare[['NPI', 'date', 'Group Practice PAC ID',
+                                        'State', 'Zip Code', 'Phone Number']]
+        phones = c.fix_pecos_phones(pecos)
+        self.physician_compare = (self.physician_compare
+                                  .drop(columns='Phone Number')
+                                  .merge(phones))
+
 
 def fix_pecos_zips(pecos):
     # Fix misshapen zip codes - 8s and 4s in states that have 0 prefixes
@@ -154,6 +163,73 @@ def fix_pecos_zips(pecos):
 
     pecos = (pecos.drop(columns=['_merge', 'Zip Code_y']))
     return pecos['Zip Code']
+
+
+def fix_pecos_phones(df):
+    df = df.assign(**{'Phone Number': df['Phone Number'].astype(str)})
+    df = df.assign(**{'Phone Number': np.where(df['Phone Number'] == '<NA>',
+                      'nan', df['Phone Number'])})
+    df = df.assign(
+        **{'Phone Number': df['Phone Number'].str.split('.', expand=True)[0]})
+    print('Unusual entries for phone number of lengths 5 and 6:')
+    print(df[(df['Phone Number'].str.len() < 10)
+             & (df['Phone Number'] != 'nan')]['Phone Number']
+          .str.len().value_counts())
+    df.loc[(df['Phone Number'].str.len() < 10) & (df['Phone Number'] != 'nan'),
+           'Phone Number'] = 'nan'
+    # If the same NPI-practice-state-zip has only one phone number and nan,
+    # replace with the phone number
+    phones = df[['NPI', 'Group Practice PAC ID',
+                 'State', 'Zip Code', 'Phone Number']].drop_duplicates()
+    phones.reset_index(drop=True, inplace=True)
+    phones_replace = (phones
+                      .loc[phones['Phone Number'] == 'nan']
+                      .merge(phones.loc[phones['Phone Number'] != 'nan'],
+                             on=['NPI', 'Group Practice PAC ID',
+                                 'State', 'Zip Code']))
+    phones_replace = (phones_replace[~phones_replace[['NPI',
+                                                      'Group Practice PAC ID',
+                                                      'State', 'Zip Code']]
+                                     .duplicated(keep=False)]
+                      .drop(columns='Phone Number_x')
+                      .rename(columns={'Phone Number_y': 'Phone Number'}))
+    df = df.merge(phones_replace,
+                  on=['NPI', 'Group Practice PAC ID', 'State', 'Zip Code'],
+                  how='left')
+    df.loc[(df['Phone Number_x'] == 'nan')
+           & (df['Phone Number_y'].notnull()),
+           'Phone Number_x'] = df['Phone Number_y']
+    df = (df
+          .drop(columns='Phone Number_y')
+          .rename(columns={'Phone Number_x': 'Phone Number'}))
+    # If the same date-practice-state-zip has only one phone number and nan,
+    # replace with the phone number
+    phones = df[['date', 'Group Practice PAC ID',
+                 'State', 'Zip Code', 'Phone Number']].drop_duplicates()
+    phones.reset_index(drop=True, inplace=True)
+    phones_replace = (phones
+                      .loc[phones['Phone Number'] == 'nan']
+                      .merge(phones.loc[phones['Phone Number'] != 'nan'],
+                             on=['date', 'Group Practice PAC ID',
+                                 'State', 'Zip Code']))
+    phones_replace = (phones_replace[~phones_replace[['date',
+                                                      'Group Practice PAC ID',
+                                                      'State', 'Zip Code']]
+                                     .duplicated(keep=False)]
+                      .drop(columns='Phone Number_x')
+                      .rename(columns={'Phone Number_y': 'Phone Number'}))
+    df = df.merge(phones_replace,
+                  on=['date', 'Group Practice PAC ID', 'State', 'Zip Code'],
+                  how='left')
+    df.loc[(df['Phone Number_x'] == 'nan')
+           & (df['Phone Number_y'].notnull()),
+           'Phone Number_x'] = df['Phone Number_y']
+    df = (df
+          .drop(columns='Phone Number_y')
+          .rename(columns={'Phone Number_x': 'Phone Number'}))
+    assert not [x for x in df['Phone Number'].values if not isinstance(x, str)]
+    # df = df.assign(**{'Phone Number': df['Phone Number'].astype('string')})
+    return df
 
 
 def medicare_program_engagement():
