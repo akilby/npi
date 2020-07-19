@@ -104,7 +104,8 @@ class PECOS(object):
         pecos = self.physician_compare[['Zip Code', 'State',
                                         'Group Practice PAC ID']]
         self.physician_compare = self.physician_compare.assign(
-            **{'Zip Code': c.fix_pecos_zips(pecos)})
+            **{'Zip Code': c.fix_pecos_zips(pecos).astype('string')
+               })
 
 
 def fix_pecos_zips(pecos):
@@ -153,8 +154,6 @@ def fix_pecos_zips(pecos):
 
     pecos = (pecos.drop(columns=['_merge', 'Zip Code_y']))
     return pecos['Zip Code']
-
-
 
 
 def medicare_program_engagement():
@@ -263,7 +262,6 @@ def group_practices_infer():
                               'State', 'Zip Code', 'Phone Number'],
                              drop_duplicates=False, date_var=True)
     pecos_groups_loc.fix_zips()
-    # FIX ZIPs
 
     # Groups can change over time so start with groups
     # with same dets over time
