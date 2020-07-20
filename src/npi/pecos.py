@@ -112,9 +112,6 @@ class PECOS(object):
         pecos = self.physician_compare[['NPI', 'date', 'Group Practice PAC ID',
                                         'State', 'Zip Code', 'Phone Number']]
         phones = c.fix_pecos_phones(pecos)
-        self.physician_compare = (self.physician_compare
-                                  .drop(columns='Phone Number')
-                                  .merge(phones))
         self.physician_compare = (self
                                   .physician_compare
                                   .reset_index()
