@@ -115,6 +115,12 @@ class PECOS(object):
         self.physician_compare = (self.physician_compare
                                   .drop(columns='Phone Number')
                                   .merge(phones))
+        self.physician_compare = (self
+                                  .physician_compare
+                                  .reset_index()
+                                  .drop(columns='Phone Number')
+                                  .merge(phones.reset_index())
+                                  .drop(columns='index'))
 
 
 def fix_pecos_zips(pecos):
@@ -338,6 +344,7 @@ def group_practices_infer():
                               'State', 'Zip Code', 'Phone Number'],
                              drop_duplicates=False, date_var=True)
     pecos_groups_loc.fix_zips()
+    pecos_groups_loc.fix_phones()
 
     # Groups can change over time so start with groups
     # with same dets over time
