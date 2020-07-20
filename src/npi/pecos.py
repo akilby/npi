@@ -352,8 +352,8 @@ def group_practices_infer():
 
     groups.loc[groups['Organization legal name'] == " ",
                'Organization legal name'] = np.nan
-    groups.loc[groups['Phone Number'].astype(str).str.len() != 12,
-               'Phone Number'] = np.nan
+    # groups.loc[groups['Phone Number'].astype(str).str.len() != 12,
+    #            'Phone Number'] = np.nan
 
     groups = groups.drop_duplicates()
 
@@ -370,6 +370,7 @@ def group_practices_infer():
     cols = ['Zip Code', 'Organization legal name',
             'Number of Group Practice members', 'State', 'Phone Number']
     for col in cols:
+
         df_u = isolate_consistent_info(groupinfo, idcols, col)
         groupinfo = update_cols(groupinfo, df_u, idcols)
 
@@ -930,8 +931,6 @@ def count_nps_for_mds_master():
     # match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State'])
     # m.query('_merge=="left_only"').drop(columns='Group Practice PAC ID').merge(match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State']))
 
-
-
 def isolate_consistent_info(df, idcols, targetcol):
     """
     If a column is consistent among the id variables,
@@ -939,8 +938,11 @@ def isolate_consistent_info(df, idcols, targetcol):
     level. we assume this is the master information
     """
     df = df[idcols + [targetcol]].drop_duplicates().dropna()
+    df = df.reset_index(drop=True)
+    df = df.loc[df[targetcol] != 'nan']
     df = df[~df[idcols].duplicated(keep=False)]
     isid(df, idcols)
+    df = df.reset_index(drop=True)
     return df
 
 
@@ -952,6 +954,12 @@ def update_cols(df, update_df, idcols):
     df = df.merge(update_df, on=idcols, how='left')
     update_cols = [x for x in update_df.columns if x not in idcols]
     for col in update_cols:
+        s1 = df.loc[((df[f'{col}_x'].isnull())
+                     | (df[f'{col}_x'] == 'nan'))
+                    & (df[f'{col}_y'].notnull())].shape
+        s2 = df.shape
+        print('Replacing %s out of %s lines, or %s percent' %
+              (s1[0], s2[0], 100*s1[0]/s2[0]))
         df[col] = df[f'{col}_x'].fillna(df[f'{col}_y'])
         df = df.drop(columns=[f'{col}_x', f'{col}_y'])
     return df
