@@ -235,7 +235,7 @@ class NPI(object):
 
     def get_ploctel(self):
         # Is .upper()ing a problem?
-        if hasattr(self, 'loctel'):
+        if hasattr(self, 'ploctel'):
             return
         self.get_removaldate()
         from .utils.globalcache import c

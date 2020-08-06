@@ -119,6 +119,9 @@ class PECOS(object):
                                   .merge(phones.reset_index())
                                   .drop(columns='index'))
 
+    def fix_orgs(self):
+        pecos_groups_loc.physician_compare[pecos_groups_loc.physician_compare['Organization legal name'].isnull()]   
+
 
 def fix_pecos_zips(pecos):
     # Fix misshapen zip codes - 8s and 4s in states that have 0 prefixes
@@ -342,6 +345,7 @@ def group_practices_infer():
                              drop_duplicates=False, date_var=True)
     pecos_groups_loc.fix_zips()
     pecos_groups_loc.fix_phones()
+
 
     # Groups can change over time so start with groups
     # with same dets over time
