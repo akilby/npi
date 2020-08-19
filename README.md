@@ -20,10 +20,16 @@ To process only one variable:
 npi process --source NPPES --variable npideactdate --update True
 ```
 
+To process only certain variables:
+
+```bash
+npi process --source NPPES --update True --include npideactdate npireactdate
+
+
 To process everything except a list of variables:
 
 ```bash
-npi process --source NPPES --update True --exclude npideactdate npireactdate 
+npi process --source NPPES --update True --exclude npideactdate npireactdate
 ```
 
 ### Using the package as an API

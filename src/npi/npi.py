@@ -15,11 +15,11 @@ from npi.constants import USE_VAR_LIST_DICT
 # from download.medical_schools import sanitize_web_medical_schools
 from utility_data.taxonomies import provider_taxonomies
 
-src = '/work/akilby/npi/data/'
+path = '/work/akilby/npi/data/'
 
 
 class NPI(object):
-    def __init__(self, src=src, npis=None, entities=[1, 2], rerun=False):
+    def __init__(self, src=path, npis=None, entities=[1, 2], rerun=False):
         from .utils.globalcache import c
         c.rerun = rerun
         self.c = c
@@ -1055,18 +1055,18 @@ def convert_practitioner_data_to_long(df,
 #     '''
 #     This is extremely rough and should get replaced
 #     MD training details for all MDs and MD Students
-# 
+#
 #     could add in discontinuities in location during training period
 #     would likely represent med school, internship, residency, fellowship
 #     '''
-# 
+#
 #     taxcode = get_taxcode(src, None, entity, [1], temporal=True)
 #     mds = taxcode.query('cat=="MD/DO"').npi.drop_duplicates()
 #     studs = taxcode.query('cat=="MD/DO Student"').npi.drop_duplicates()
 #     fresh_mds = mds[mds.isin(studs)]
 #     old_mds = mds[~mds.isin(studs)]
 #     trainees = studs[~studs.isin(mds)]
-# 
+#
 #     schools = sanitize_web_medical_schools()
 #     actually_freshmds = (schools.merge(trainees, how='right')
 #                                 .dropna()
@@ -1081,9 +1081,9 @@ def convert_practitioner_data_to_long(df,
 #                                     .npi.drop_duplicates())
 #     trainees = trainees.append(looklike_stilltrainee)
 #     fresh_mds = fresh_mds[~fresh_mds.isin(looklike_stilltrainee)]
-# 
+#
 #     fresh_mds = taxcode.merge(fresh_mds)
-# 
+#
 #     fresh_mds = (fresh_mds[['npi']]
 #                  .drop_duplicates()
 #                  .merge((fresh_mds.query('cat=="MD/DO Student"')
@@ -1121,4 +1121,4 @@ def convert_practitioner_data_to_long(df,
 #                         'recent_mds': fresh_mds,
 #                         'older_mds': old_mds}
 #     return training_details
-# 
+#
