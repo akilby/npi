@@ -120,7 +120,7 @@ class PECOS(object):
                                   .drop(columns='index'))
 
     def fix_orgs(self):
-        self.physician_compare = self.physician_compare.loc[
+        self.physician_compare.loc[
             self.physician_compare['Organization legal name'] == " ",
             'Organization legal name'] = np.nan
 
