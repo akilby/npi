@@ -338,8 +338,7 @@ def medical_school(include_web_scraped=True):
 
 
 def group_practices_infer():
-    # 2. Get group practice information. most sole practitioners
-    # are missing a group practice ID
+    # 1. Read in physician compare data
     pecos_groups_loc = PECOS(['NPI', 'Organization legal name',
                               'Group Practice PAC ID',
                               'Number of Group Practice members',
@@ -349,60 +348,129 @@ def group_practices_infer():
     pecos_groups_loc.fix_phones()
     pecos_groups_loc.fix_orgs()
 
-    # Groups can change over time so start with groups
-    # with same dets over time
     groups = (pecos_groups_loc
               .physician_compare
               .drop_duplicates()
               .reset_index(drop=True))
 
-    groups.loc[groups['Organization legal name'] == " ",
-               'Organization legal name'] = np.nan
-    # groups.loc[groups['Phone Number'].astype(str).str.len() != 12,
-    #            'Phone Number'] = np.nan
-
-    groups = groups.drop_duplicates()
-
-    # Split into dfs with group ids and no group ids
+    ###########################################################################
+    # 2. Split into dfs with group ids and no group ids
     groupinfo = (groups.loc[groups['Group Practice PAC ID'].notnull()]
                        .reset_index(drop=True))
     missinggroup = (groups.loc[groups['Group Practice PAC ID'].isnull()]
                           .reset_index(drop=True))
 
+    # want NPIs that are in the groupinfo data to always
+    # be included in groupinfo
+    npis_in_both = (missinggroup[['NPI']]
+                    .drop_duplicates()
+                    .merge(groupinfo['NPI'].drop_duplicates()))
+
+    # people missing group practice IDs who have them at some point and are
+    # in groupinfo - add to groupinfo to impute
+
+    groupinfo = groupinfo.append(missinggroup.merge(npis_in_both))
+
+    # people missing group practice IDs who never have them at any point
+    missinggroup = (missinggroup
+                    .merge(npis_in_both, how='left', indicator=True)
+                    .query('_merge=="left_only"')
+                    .drop(columns='_merge'))
+
+    ###########################################################################
+
+    # if only one group practice ID for an NPI-state-zip code-Phone; fill in
+    idcols = ['NPI', 'State', 'Zip Code', 'Phone Number']
+    updatecols = ['Group Practice PAC ID']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
+
+    # fill in missing information at the NPI-Group Practice ID if there is only
+    # one listed, e.g., phone number for that NPI-Practice ID
+    idcols = ['NPI', 'Group Practice PAC ID']
+    updatecols = ['Zip Code', 'Organization legal name',
+                  'Number of Group Practice members', 'State', 'Phone Number']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
+
+    ###########################################################################
+    early_years = groupinfo[~groupinfo.date.dt.year.isin(range(2018, 2021))]
+    late_years = groupinfo[groupinfo.date.dt.year.isin(range(2018, 2021))]
+
+    idcols = ['NPI', 'Group Practice PAC ID']
+    updatecols = ['Zip Code', 'Organization legal name',
+                  'Number of Group Practice members', 'State', 'Phone Number']
+    early_years = batch_update_cols_with_consistent_info(
+        early_years, idcols, updatecols)
+    late_years = batch_update_cols_with_consistent_info(
+        late_years, idcols, updatecols)
+
+    idcols = ['NPI', 'State', 'Zip Code', 'Phone Number']
+    updatecols = ['Group Practice PAC ID']
+    early_years = batch_update_cols_with_consistent_info(
+        early_years, idcols, updatecols)
+    late_years = batch_update_cols_with_consistent_info(
+        late_years, idcols, updatecols)
+
+    groupinfo = early_years.append(late_years)
+    ###########################################################################
+
+    idcols = ['NPI', 'State', 'Zip Code']
+    targetcols = ['Organization legal name',
+                  'Number of Group Practice members',
+                  'Phone Number',
+                  'Group Practice PAC ID']
+    df_u = isolate_consistent_info(late_years, idcols, targetcols)
+    late_years = update_cols(late_years, df_u, idcols)
+    ###########################################################################
+
+    # only one group practice for an NPI; fill in
+    idcols = ['NPI']
+    updatecols = ['Group Practice PAC ID']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
+
+    # only one group practice for an NPI-date; fill in
+    idcols = ['NPI', 'date']
+    updatecols = ['Group Practice PAC ID']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
+
+    # only one group practice for an NPI-state-zip code; fill in
+    idcols = ['NPI', 'State', 'Zip Code']
+    updatecols = ['Group Practice PAC ID']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
+
+    print('Many groups missing phone numbers: ',
+          (groupinfo['Phone Number'] == 'nan').sum()/groupinfo.shape[0])
+
     # Get any information that is consistent by NPI and Group Practice
     # and update the missing information
     # this mostly fixes phone numbers
     idcols = ['NPI', 'Group Practice PAC ID']
-    cols = ['Zip Code', 'Organization legal name',
-            'Number of Group Practice members', 'State', 'Phone Number']
-    for col in cols:
+    updatecols = ['Zip Code', 'Organization legal name',
+                  'Number of Group Practice members', 'State', 'Phone Number']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
 
-        df_u = isolate_consistent_info(groupinfo, idcols, col)
-        groupinfo = update_cols(groupinfo, df_u, idcols)
+    idcols = ['NPI', 'State', 'Zip Code', 'Phone Number']
+    updatecols = ['Group Practice PAC ID']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
 
-    groupinfo = groupinfo.drop_duplicates().reset_index(drop=True)
+    idcols = ['NPI', 'Group Practice PAC ID']
+    updatecols = ['Zip Code', 'Organization legal name',
+                  'Number of Group Practice members', 'State', 'Phone Number']
+    groupinfo = batch_update_cols_with_consistent_info(
+        groupinfo, idcols, updatecols)
 
-    # do the same fill-in for people missing group practice ids
-    npis_in_both = (missinggroup[['NPI']]
-                    .drop_duplicates()
-                    .merge(groupinfo['NPI'].drop_duplicates()))
-    mg1 = (missinggroup
-           .merge(npis_in_both, how='left', indicator=True)
-           .query('_merge=="left_only"')
-           .drop(columns='_merge'))
-    mg2 = (missinggroup
-           .merge(npis_in_both, how='left', indicator=True)
-           .query('_merge=="both"')
-           .drop(columns='_merge'))
+    # do the same fill-in for people entirely missing group practice ids
     idcols = ['NPI']
-    cols = ['Zip Code', 'Organization legal name',
-            'Number of Group Practice members', 'State', 'Phone Number']
-    for col in cols:
-        df_u = isolate_consistent_info(mg1, idcols, col)
-        if not df_u.empty:
-            mg1 = update_cols(mg1, df_u, idcols)
-
-    missinggroup = mg1.append(mg2).drop_duplicates().reset_index(drop=True)
+    updatecols = ['Zip Code', 'Organization legal name',
+                  'Number of Group Practice members', 'State', 'Phone Number']
+    missinggroup = batch_update_cols_with_consistent_info(
+        missinggroup, idcols, updatecols)
 
     # Can now look for people missing group numbers, to see if there
     # is a unique match on state, zip, phone, date
@@ -937,15 +1005,25 @@ def count_nps_for_mds_master():
     # match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State'])
     # m.query('_merge=="left_only"').drop(columns='Group Practice PAC ID').merge(match_groups_phone.assign(ploctel=match_groups_phone['Phone Number'].astype(str).str.split('.').str[0], ploczip = match_groups_phone['Zip Code'], plocstatename=match_groups_phone['State']))
 
-def isolate_consistent_info(df, idcols, targetcol):
+def isolate_consistent_info(df, idcols, targetcols):
     """
     If a column is consistent among the id variables,
     this retrieves that info, unique at the idcols
     level. we assume this is the master information
+
+    If targetcols is a list, only need some of them to be non-missing
+    NOT ALL. Ie targetcols contain some information as a group
     """
-    df = df[idcols + [targetcol]].drop_duplicates().dropna()
-    df = df.reset_index(drop=True)
-    df = df.loc[df[targetcol] != 'nan']
+    if isinstance(targetcols, str):
+        df = (df[idcols + [targetcols]]
+              .drop_duplicates()
+              .dropna()
+              .loc[lambda d: d[targetcols] != 'nan']
+              .reset_index(drop=True))
+    elif isinstance(targetcols, list):
+        df = fully_blank_rows_in_varlist(
+            df[idcols + targetcols].drop_duplicates(),
+            targetcols, inverse=True)
     df = df[~df[idcols].duplicated(keep=False)]
     isid(df, idcols)
     df = df.reset_index(drop=True)
@@ -958,14 +1036,38 @@ def update_cols(df, update_df, idcols):
     merged in on the idcols level
     """
     df = df.merge(update_df, on=idcols, how='left')
-    update_cols = [x for x in update_df.columns if x not in idcols]
-    for col in update_cols:
-        s1 = df.loc[((df[f'{col}_x'].isnull())
-                     | (df[f'{col}_x'] == 'nan'))
-                    & (df[f'{col}_y'].notnull())].shape
-        s2 = df.shape
-        print('Replacing %s out of %s lines, or %s percent' %
-              (s1[0], s2[0], 100*s1[0]/s2[0]))
+    updatecols = [x for x in update_df.columns if x not in idcols]
+    for col in updatecols:
+        cond = ((df[f'{col}_x'].isnull())
+                | (df[f'{col}_x'] == 'nan')) & (df[f'{col}_y'].notnull())
+        s1 = cond.sum()
+        s2 = df.shape[0]
+        print('For col %s, replacing %s out of %s lines, or %s percent' %
+              (col, s1, s2, 100*s1/s2))
         df[col] = df[f'{col}_x'].fillna(df[f'{col}_y'])
+        df.loc[cond, col] = df[f'{col}_y']
         df = df.drop(columns=[f'{col}_x', f'{col}_y'])
     return df
+
+
+def batch_update_cols_with_consistent_info(df, idcols, updatecols):
+    """
+    update columns of df per the above two functions
+
+    return a DF with duplicates dropped
+    """
+    for col in updatecols:
+        print('updating column:', col)
+        if any((df[col].isnull()) | (df[col] == 'nan')):
+            df_u = isolate_consistent_info(df, idcols, col)
+            if not df_u.empty:
+                df = update_cols(df, df_u, idcols)
+
+    return df.drop_duplicates().reset_index(drop=True)
+
+
+def fully_blank_rows_in_varlist(df, varlist, inverse=False):
+    return (df[(((df[varlist].isnull()) | (df[varlist] == 'nan')).all(1))]
+            if not inverse
+            else
+            df[~(((df[varlist].isnull()) | (df[varlist] == 'nan')).all(1))])
