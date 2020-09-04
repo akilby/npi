@@ -199,28 +199,28 @@ def generate_matches(s, npi, pecos, varlist, practypes, final_crosswalk):
 
 
 # out = make_clean_matches_iterate(df1, 'samhsa_id', 'order', df2, 'npi', pd.DataFrame())
-# 
+#
 # priority_names = out[['samhsa_id']].assign(order=1).merge(df1)
 # priority_names['new_firstname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[0])
-# priority_names['new_middlename'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+# priority_names['new_middlename'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: ' '.join(x.split()[1:-1]))
 # priority_names['new_lastname'] = priority_names.assign(n=lambda df: df['firstname'] + ' ' +  df['middlename'] + ' '  + df['lastname']).n.apply(lambda x: x.split()[-1])
-# priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)  
-# priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()  
-# 
+# priority_names = priority_names.assign(new_suffix=lambda df: df.Suffix)
+# priority_names = priority_names[['samhsa_id','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()
+#
 # # USE RECONCAT NAMES
 # priority_names2 = out[['npi']].merge(df2)
 # priority_names2['new_firstname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[0])
-# priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1])) 
+# priority_names2['new_middlename'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: ' '.join(x.split()[1:-1]))
 # priority_names2['new_lastname'] = priority_names2.assign(n=lambda df: df['pfname'] + ' ' +  df['pmname'] + ' '  + df['plname']).n.apply(lambda x: x.split()[-1])
-# priority_names2 = priority_names2.assign(new_suffix=lambda df: df.pnamesuffix)  
-# priority_names2 = priority_names2[['npi','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()   
-# 
+# priority_names2 = priority_names2.assign(new_suffix=lambda df: df.pnamesuffix)
+# priority_names2 = priority_names2[['npi','new_firstname','new_middlename','new_lastname','new_suffix','practitioner_type','state','zip5']].drop_duplicates()
+#
 # expand_matches = out[['samhsa_id','npi']].merge(priority_names).merge(out[['samhsa_id','npi']].merge(priority_names2), how='outer', indicator=True)
 # all_good = expand_matches.query('_merge=="both"')[['samhsa_id','npi']].drop_duplicates()
 # expand_matches = expand_matches.merge(all_good, how='left', indicator='_merge2').query('_merge2!="both"').drop(columns='_merge2')
-# 
-# o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())            
-# o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())                
+#
+# o1 = out.merge(df1[['samhsa_id', 'middlename','Suffix']].dropna().query('middlename!="" or Suffix!=""').drop_duplicates())
+# o2 = out.merge(df2[['npi', 'pmname', 'pnamesuffix']].dropna().query('pmname!="" or pnamesuffix!=""').drop_duplicates())
 # lo1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="left_only"')[['samhsa_id','npi']].drop_duplicates()
 # ro1 = o1.merge(o2, left_on=o1.columns.tolist(), right_on=o2.columns.tolist(), how='outer', indicator=True).query('_merge=="right_only"')[['samhsa_id','npi']].drop_duplicates()
 # lo1.merge(ro1)
@@ -585,7 +585,64 @@ def analysis_dataset():
     isid(copracs, ['npi', 'date'])
     return copracs
 
-    
+
+def final_analysis_dataset(final):
+    npi = NPI(entities=1)
+
+    # gender
+    npi.retrieve('pgender')
+
+    # education
+    educ = (PECOS(['NPI', 'Medical school name', 'Graduation year'])
+            .physician_compare)
+    educ = educ.groupby('NPI', as_index=False).first()
+    educ['gradyear'] = pd.qcut(educ['Graduation year'], 20)
+
+    # Specialties. time varying?
+    pecos_specs = PECOS(['NPI', 'Primary specialty',
+                         'Secondary specialty 1',
+                         'Secondary specialty 2',
+                         'Secondary specialty 3',
+                         'Secondary specialty 4'],
+                        drop_duplicates=False, date_var=True)
+
+    specs = (pecos_specs
+             .physician_compare
+             .drop(columns='date')
+             .drop_duplicates()
+             .set_index(['NPI', 'Primary specialty'])
+             .stack()
+             .reset_index()
+             .drop(columns='level_2')
+             .rename(columns={0: 'secondary_spec'}))
+
+    taxcodes = npi.retrieve('ptaxcode')
+
+    # waiver dates from new file
+    matches = pickle_read(
+      '/work/akilby/npi/Cache/Caches/output_1588990540883395.pkl')
+    s = SAMHSA()
+    samhsa_match = (s.samhsa[['WaiverType', 'samhsa_id', 'Date', 'State']]
+                    .drop_duplicates())
+    samhsa_match = samhsa_match.merge(matches)
+    sam2 = (samhsa_match[['npi','State', 'Date', 'WaiverType']]
+            .groupby(['npi', 'State', 'WaiverType'])
+            .min()
+            .unstack(2)
+            .reset_index())
+    sam2.columns = ['npi', 'State', 'Date30', 'Date100', 'Date275']
+
+    # ####
+
+    final = final.reset_index().merge(educ, how='left')
+    final = final.rename(columns={'NPI': 'npi'}).merge(npi.pgender)
+
+    # because I added in the state column, I now lose 884 Mds
+    final = final.merge(sam2, how='left')
+
+    return final, taxcodes, specs
+
+
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
     #                  write_index=False)
@@ -606,7 +663,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df3, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 1. exact match on name, practitioner type, state, and zip code
     # df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
     # df2 = conform_data_sources(npi, ['practitioner_type', 'state', 'zip5'],
@@ -620,7 +677,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df3, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 2. exact match on name, practitioner type, and state
     # df1 = conform_data_sources(s, ['practitioner_type', 'state'])
     # df2 = conform_data_sources(npi, ['practitioner_type', 'state'],
@@ -628,7 +685,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 3. exact match on name, practitioner type, and secondary practice state
     # # and zip code
     # df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
@@ -637,7 +694,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 4. exact match on name, practitioner type, and secondary practice state
     # df1 = conform_data_sources(s, ['practitioner_type', 'state'])
     # df2 = conform_data_sources(npi, ['practitioner_type', 'state'],
@@ -645,7 +702,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 5. PECOS: exact match on name, type, state, and zip
     # df1 = conform_data_sources(s, ['practitioner_type', 'state', 'zip5'])
     # df2 = conform_data_sources(pecos, ['practitioner_type', 'state', 'zip5'],
@@ -654,7 +711,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 6. PECOS: exact match on name, type, state
     # df1 = conform_data_sources(s, ['practitioner_type', 'state'])
     # df2 = conform_data_sources(pecos, ['practitioner_type', 'state'],
@@ -663,7 +720,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 7. exact match on name, practitioner type, in NPI
     # df1 = conform_data_sources(s, ['practitioner_type'])
     # df2 = conform_data_sources(npi, ['practitioner_type'],
@@ -671,7 +728,7 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 8. PECOS: exact match on name, type
     # df1 = conform_data_sources(s, ['practitioner_type'])
     # df2 = conform_data_sources(pecos, ['practitioner_type'],
@@ -680,17 +737,17 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # assert final_crosswalk.samhsa_id.is_unique
     # assert final_crosswalk.npi.is_unique
-# 
+#
     # # 9. exact match on name, state, and zip code
     # df1 = conform_data_sources(s, ['state', 'zip5'])
     # df2 = conform_data_sources(npi, ['state', 'zip5'])
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 10. PECOS: exact match on name, state, and zip
     # df1 = conform_data_sources(s, ['state', 'zip5'])
     # df2 = conform_data_sources(pecos, ['state', 'zip5'],)
@@ -698,14 +755,14 @@ def analysis_dataset():
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 11. exact match on name, state
     # df1 = conform_data_sources(s, ['state'])
     # df2 = conform_data_sources(npi, ['state'])
     # final_crosswalk = make_clean_matches_iterate(df1, 'samhsa_id', 'order',
     #                                              df2, 'npi', final_crosswalk)
     # print('Found %s matches' % final_crosswalk.shape[0])
-# 
+#
     # # 12. PECOS: exact match on name, state
     # df1 = conform_data_sources(s, ['state'])
     # df2 = conform_data_sources(pecos, ['state'],)
@@ -770,12 +827,12 @@ def analysis_dataset():
 #                     lastname='lastname')
 #               .drop(columns='name')
 #               .drop_duplicates())
-# 
+#
 # pc_names_credential_state_zip = (
 #     names.merge(pc_names_state_zip.drop(columns=['lastname', 'firstname',
 #                                                  'middlename']))
 #          .merge(npi.practitioner_type.pipe(convert_practitioner_data_to_long)))
-# 
+#
 # for o in orders:
 #     m = make_clean_matches(
 #         samhsa_names_credential_state_zip.query(f'order=={o}'),
@@ -783,7 +840,7 @@ def analysis_dataset():
 #         id_use='samhsa_id', id_target='npi',
 #         blocklist=final_crosswalk)
 #     final_crosswalk = final_crosswalk.append(m)
-# 
+#
 # # Next, drop zipcode and match only on state, credential and name
 # for o in orders:
 #     m = make_clean_matches(
@@ -793,13 +850,13 @@ def analysis_dataset():
 #         id_use='samhsa_id', id_target='npi',
 #         blocklist=final_crosswalk)
 #     final_crosswalk = final_crosswalk.append(m)
-# 
+#
 # ##############################################################################
 # ##############################################################################
 # ##############################################################################
 # ##############################################################################
-# 
-# # merges in all variations of names with all possible states that NPI is 
+#
+# # merges in all variations of names with all possible states that NPI is
 # # observed
 # # at
 # new = (npi.expanded_fullnames
@@ -812,12 +869,12 @@ def analysis_dataset():
 #           .merge((npi.plocstatename[['npi', 'plocstatename']]
 #                      .drop_duplicates()), how='left')
 #           .drop(columns='entity'))
-# 
+#
 # npi.secondary_practice_locations
-# 
-# 
+#
+#
 # q = 'pcredential_stripped=="MD" or pcredential_stripped=="DO"'
-# 
+#
 # new = (new.append((new.merge(new.loc[new.practype == "MD/DO"][['npi']]
 #                                 .drop_duplicates()
 #                                 .merge(npi.credentials
@@ -838,41 +895,41 @@ def analysis_dataset():
 #                                   .assign(practype='MD/DO')))
 #                       .drop_duplicates()))
 #           .drop_duplicates())
-# 
-# 
+#
+#
 # sam = s.names.merge(s.samhsa[['PractitionerType', 'State', 'samhsa_id']].drop_duplicates())
 # samhsa_matches = sam.drop(columns=['firstname', 'middlename', 'lastname', 'Credential String']).merge(new.drop(columns=['pfname','pmname','plname']), left_on=['name','PractitionerType','State'], right_on=['name','practype','plocstatename'])
 # samhsa_matches = samhsa_matches.merge(samhsa_matches[['samhsa_id', 'npi']].drop_duplicates().groupby('samhsa_id').count().reset_index().query('npi>1').drop(columns='npi'), on='samhsa_id', indicator=True, how='outer').query('_merge=="left_only"').drop(columns=['_merge'])
 # samhsa_matches = samhsa_matches[~samhsa_matches.npi.isin(samhsa_matches[['samhsa_id', 'npi']].drop_duplicates().groupby('npi').count().query('samhsa_id>1').reset_index().npi)]
-# 
+#
 # matches1 = samhsa_matches[['samhsa_id', 'npi']].drop_duplicates()
 # remainders1 = sam.merge(samhsa_matches[['samhsa_id']].drop_duplicates(), how='outer', indicator=True).query('_merge!="both"').drop(columns='_merge')
-# 
+#
 # remainders1 = remainders1.query('middlename!=""').merge(new.query('pmname!=""'), left_on=['name','PractitionerType','State'], right_on=['name','practype','plocstatename']).sort_values('samhsa_id')
 # matches2 = remainders1[~remainders1.samhsa_id.isin(remainders1[['samhsa_id', 'npi']].drop_duplicates().groupby('samhsa_id').count().query('npi>1').reset_index().samhsa_id)]
 # matches2 = matches2[['samhsa_id', 'npi']].drop_duplicates()
-# 
+#
 # matches = matches1.append(matches2)
-# 
+#
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # dd = s.samhsa.drop(columns='npi').merge(matches[matches.npi.isin(dups.npi)], on='samhsa_id').sort_values('npi').drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent','First name', 'Last name','NPI state','Date', 'Telephone', 'statecode', 'geoid', 'zcta5', 'zip', 'CurrentPatientLimit', 'NumberPatientsCertifiedFor', 'Index', 'DateGranted', 'Street2'])
 # dd[['County']] = dd.County.str.upper()
 # dd[['City']] = dd.City.str.upper()
-# 
+#
 # a1 = dd[~dd.npi.isin(dd[['npi','PractitionerType','Phone']].drop_duplicates()[dd[['npi','PractitionerType','Phone']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
 # a2 = dd[~dd.npi.isin(dd[['npi','PractitionerType','County']].drop_duplicates()[dd[['npi','PractitionerType','County']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
 # a3 = dd[~dd.npi.isin(dd[['npi','PractitionerType','City', 'State']].drop_duplicates()[dd[['npi','PractitionerType','City', 'State']].drop_duplicates().npi.duplicated()].npi)][['samhsa_id', 'npi']]
 # fine = a1.append(a2).append(a3).drop_duplicates()
 # dups[~dups.npi.isin(fine.npi)]
-# 
+#
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 # remainders2 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
-# 
+#
 # zips = npi.loczip[['npi', 'ploczip']].drop_duplicates()
 # zips['zip']=zips.ploczip.str[:5]
 # zips = zips[['npi','zip']].drop_duplicates()
 # new2 = new.drop(columns='plocstatename').drop_duplicates().merge(zips)
-# 
+#
 # sam2 = s.names.merge(s.samhsa[['PractitionerType', 'Zip', 'samhsa_id']].drop_duplicates())
 # sam2['zip'] = sam2.Zip.str[:5]
 # sam2 = sam2.drop(columns="Zip").drop_duplicates()
@@ -881,10 +938,10 @@ def analysis_dataset():
 # matches = matches.append(new_matches[['samhsa_id', 'npi']].drop_duplicates())
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
-# 
+#
 # remainders3 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
-# 
-# 
+#
+#
 # new3 = new2[['npi', 'name', 'practype']].drop_duplicates()
 # match4 = remainders3[['name', 'PractitionerType', 'samhsa_id']].drop_duplicates().merge(new3, left_on=['name','PractitionerType'], right_on=['name','practype'])
 # match4 = match4[['samhsa_id', 'npi']].drop_duplicates()
@@ -893,8 +950,8 @@ def analysis_dataset():
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 # remainders4 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
-# 
-# 
+#
+#
 # new4 = new2.query('pmname!=""')[['npi', 'name', 'practype']].drop_duplicates()
 # match5 = remainders4.query('middlename!=""')[['name','PractitionerType','samhsa_id']].drop_duplicates().merge(new4, left_on=['name','PractitionerType'], right_on=['name','practype'])
 # match5 = match5[['samhsa_id', 'npi']].drop_duplicates()
@@ -903,21 +960,21 @@ def analysis_dataset():
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
 # remainders5 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
-# 
-# 
+#
+#
 # remainders5['name_nochars']=remainders5['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
 # new2['name_nochars']=new2['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
 # new['name_nochars']=new['name'].str.replace("'"," ").str.replace('-',' ').str.replace('.',' ')
-# 
+#
 # sam_zips = s.names.merge(s.samhsa[['PractitionerType', 'Zip', 'samhsa_id']].drop_duplicates())
 # sam_zips['zip'] = sam_zips.Zip.str[:5]
 # sam_zips = sam_zips.drop(columns="Zip").drop_duplicates()
-# 
+#
 # a1 = remainders5.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name_nochars','practype','plocstatename'])
 # a2 = remainders5.merge(new, left_on=['name_nochars', 'PractitionerType','State'], right_on=['name','practype','plocstatename'])
 # a3 = remainders5.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name_nochars','practype','zip'])
 # a4 = remainders5.merge(sam_zips, how='left').merge(new2, left_on=['name_nochars', 'PractitionerType','zip'], right_on=['name','practype','zip'])
-# 
+#
 # newmatched_a = a3.append(a4)[['samhsa_id', 'npi']].drop_duplicates()
 # dups = newmatched_a[['npi']][newmatched_a[['npi']].duplicated()]
 # dups2 = newmatched_a[['samhsa_id']][newmatched_a[['samhsa_id']].duplicated()]
@@ -929,7 +986,7 @@ def analysis_dataset():
 # matches = matches.append(newmatched_a[['samhsa_id', 'npi']].drop_duplicates())
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
-# 
+#
 # newmatched_b = a1.append(a2)[['samhsa_id', 'npi']].drop_duplicates()
 # newmatched_b = newmatched_b.merge(newmatched_a['samhsa_id'], indicator=True, how='left').query('_merge!="both"').drop(columns='_merge')
 # dups = newmatched_b[['npi']][newmatched_b[['npi']].duplicated()]
@@ -942,7 +999,7 @@ def analysis_dataset():
 # matches = matches.append(newmatched_b[['samhsa_id', 'npi']].drop_duplicates())
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
-# 
+#
 # remainders6 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi'])
 # remainders6['name_nochars']=remainders6['name'].str.replace("'","").str.replace('-','').str.replace('.','')
 # new2['name_nochars']=new2['name'].str.replace("'","").str.replace('-',' ').str.replace('.','')
@@ -962,7 +1019,7 @@ def analysis_dataset():
 # matches = matches.append(newmatched_a[['samhsa_id', 'npi']].drop_duplicates())
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
-# 
+#
 # newmatched_b = a1.append(a2)[['samhsa_id', 'npi']].drop_duplicates()
 # newmatched_b = newmatched_b.merge(newmatched_a['samhsa_id'], indicator=True, how='left').query('_merge!="both"').drop(columns='_merge')
 # dups = newmatched_b[['npi']][newmatched_b[['npi']].duplicated()]
@@ -975,25 +1032,25 @@ def analysis_dataset():
 # matches = matches.append(newmatched_b[['samhsa_id', 'npi']].drop_duplicates())
 # dups = matches[['npi']][matches[['npi']].duplicated()]
 # matches = matches[~matches.npi.isin(dups[~dups.npi.isin(fine.npi)].npi)]
-# 
+#
 # matches = matches.append(pd.DataFrame({'samhsa_id': [3796, 3795, 214], 'npi': [1699731661, 1720044811, 1770933707]})).drop_duplicates().sort_values('samhsa_id').reset_index(drop=True)
-# 
+#
 # remainders7 = sam.merge(matches, how='outer', indicator=True).query('_merge!="both"').drop(columns=['_merge', 'npi']).merge(sam_zips, how='left')
 # matches.to_csv('/work/akilby/npi/samhsa_npi_partial_match.csv')
 # usable_data = s.samhsa.drop(columns='npi').merge(matches, on='samhsa_id').sort_values('npi').drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent','First name', 'Last name','NPI state','Date',  'statecode', 'geoid', 'zcta5', 'zip', 'Index'])
-# 
+#
 # usable_data = usable_data.drop_duplicates().reset_index(drop=True)
-# 
+#
 # usable_data['Date']=usable_data['DateGranted']
 # usable_data.loc[usable_data['Date'].isnull(), 'Date'] = usable_data['DateLastCertified']
-# 
+#
 # usable_data.to_csv('/work/akilby/npi/samhsa_npi_usable_data.csv', index=False)
-# 
+#
 # #these all actually look correct
 # matches[matches.samhsa_id.isin(matches[matches.samhsa_id.duplicated()].samhsa_id)].head(60)
-# 
+#
 # # check for special characters
-# 
+#
 
 # samhsa = samhsa.drop(columns=['Unnamed: 0', 'LocatorWebsiteConsent',
 #                               'First name', 'Last name', 'npi', 'NPI state',
@@ -1004,14 +1061,14 @@ def analysis_dataset():
 # mindate = (samhsa[['samhsa_id', 'DateGranted']].dropna()
 #                                                .groupby('samhsa_id')
 #                                                .min().reset_index())
-# 
+#
 # samhsa = (samhsa.fillna('')
 #                 .groupby(['NameFull', 'samhsa_id', 'PractitionerType',
 #                           'DateLastCertified', 'Street1', 'Street2',
 #                           'City', 'State', 'Zip', 'County', 'Phone'])
 #                 .agg({'WaiverType': max})
 #                 .reset_index())
-# 
+#
 # samhsa = samhsa.merge(mindate, how='left')
 
 
@@ -1019,26 +1076,26 @@ def analysis_dataset():
 
 
 # name_matches = expanded_fullnames[['name','npi']].merge(expanded_names[['name','samhsa_id']])
-# 
-# 
+#
+#
 # # taxcode.merge(credentials, how='outer')
-# 
+#
 # samhsa.merge(npi.fullnames[['npi','name']], left_on='NameFull', right_on='name').merge(npi.credentials, how='left', on='npi').merge(npi.taxcode, how='left', on='npi')
 
 
 # def check_in(it, li):
 #     return it in li
-# 
-# 
+#
+#
 # def replace_end(namestr, stub):
 #     return (namestr.replace(stub, '').strip() if namestr.endswith(stub)
 #             else namestr.strip())
-# 
-# 
+#
+#
 # # for b in badl:
 # #     df_samhsa['NameFull'] = df_samhsa.NameFull.apply(lambda x: replace_end(x, b))
-# 
-# 
+#
+#
 # def npi_names_to_samhsa_matches(firstname, lastname, df_samhsa):
 #     u = df_samhsa[df_samhsa.NameFull.str.contains(lastname)]
 #     u = u[u.NameFull.str.split(lastname).str[0].str.contains(firstname)]
@@ -1048,14 +1105,14 @@ def analysis_dataset():
 #         u = u[u.splitli.apply(lambda x: check_in(firstname, x))]
 #         u = u[u.splitli.apply(lambda x: check_in(lastname, x))]
 #     return u
-# 
-# 
+#
+#
 # def state_npis(stateabbrev, states, names):
 #     npis = states.query(
 #         'plocstatename=="%s"' % stateabbrev).npi.drop_duplicates()
 #     return names.merge(npis)
-# 
-# 
+#
+#
 # def npi_names_sahmsa_matches_statebatch(stateabbrev):
 #     s = time.time()
 #     outcome_df, fn, ln = pd.DataFrame(), [], []
@@ -1080,17 +1137,17 @@ def analysis_dataset():
 #             outcome_df = outcome_df.append(o)
 #     print('time:', time.time() - s)
 #     return outcome_df, fn, ln
-# 
-# 
+#
+#
 # outcome_df = pd.read_csv('/home/akilby/outcome_df_samhsa_match.csv')
-# 
+#
 # outcome_df.drop(columns=['Unnamed: 0'], inplace=True)
-# 
+#
 # merged = outcome_df.merge(locstatename, left_on=['npi', 'State'], right_on=['npi', 'plocstatename'])
 # merged['diff'] = pd.to_datetime(merged['DateLastCertified']) - pd.to_datetime(merged['month'])
 # merged = merged.sort_values(['NameFull', 'State', 'DateLastCertified', 'npi', 'diff'])
 # merged['diff2'] = abs(merged['diff'])
-# 
+#
 # possibles = merged[['NameFull', 'State', 'DateLastCertified', 'npi', 'pfname', 'plname', 'diff2']].groupby(['NameFull', 'State', 'DateLastCertified', 'npi', 'pfname', 'plname']).min()
 # possibles = possibles.merge(possibles.groupby(level=[0, 1, 2]).count(), left_index=True, right_index=True)
 
@@ -1107,25 +1164,25 @@ def analysis_dataset():
 #                      .reset_index()
 #                      .rename(columns=dict(index='samhsa_id')))
 # samhsa_orig = samhsa.merge(ids)
-# 
+#
 # samhsa_match = pd.read_csv('/work/akilby/npi/samhsa_processing/samhsa_npi_usable_data_with_locs.csv')
-# 
-# 
+#
+#
 # samhsa_orig.samhsa_id.drop_duplicates()
 # samhsa_match.samhsa_id.drop_duplicates()
-# 
+#
 # cols = ['Primary specialty','Secondary specialty 1', 'Secondary specialty 2','Secondary specialty 3', 'Secondary specialty 4']
 # groups = physician_compare_select_vars(['Group Practice PAC ID', 'Number of Group Practice members']+cols, drop_duplicates=False,date_var=True)
-# samhsa_match = samhsa_match[['WaiverType', 'PractitionerType', 'samhsa_id', 'npi', 'location_no', 'ploctel', 'zip', 'plocstatename', 'Date']].drop_duplicates() 
-# 
-# npi=NPI(entities=1)     
+# samhsa_match = samhsa_match[['WaiverType', 'PractitionerType', 'samhsa_id', 'npi', 'location_no', 'ploctel', 'zip', 'plocstatename', 'Date']].drop_duplicates()
+#
+# npi=NPI(entities=1)
 # npi.retrieve('ptaxcode')
-# 
-# 
-# groups.assign(prim=groups['Primary specialty']).query('prim=="NURSE PRACTITIONER"').groupby(['Group Practice PAC ID', 'date']).size() 
-# mds_pecos=npi.ptaxcode.query('cat=="MD/DO" or cat=="MD/DO Student"')[['npi', 'cat']].assign(cat2=lambda df: df.cat=="MD/DO").groupby('npi', as_index=False).sum().merge(groups.rename(columns={'NPI':'npi'}))  
-# 
-# 
+#
+#
+# groups.assign(prim=groups['Primary specialty']).query('prim=="NURSE PRACTITIONER"').groupby(['Group Practice PAC ID', 'date']).size()
+# mds_pecos=npi.ptaxcode.query('cat=="MD/DO" or cat=="MD/DO Student"')[['npi', 'cat']].assign(cat2=lambda df: df.cat=="MD/DO").groupby('npi', as_index=False).sum().merge(groups.rename(columns={'NPI':'npi'}))
+#
+#
 # badli = ['PHYSICIAN ASSISTANT',
 #          'CERTIFIED REGISTERED NURSE ANESTHETIST',
 #          'CLINICAL SOCIAL WORKER',
@@ -1140,44 +1197,44 @@ def analysis_dataset():
 #          'CERTIFIED NURSE MIDWIFE',
 #          'REGISTERED DIETITIAN OR NUTRITION PROFESSIONAL',
 #          'CERTIFIED NURSE MIDWIFE (CNM)']
-# 
-# 
+#
+#
 # for item in badli:
-#     mds_pecos.loc[(mds_pecos.cat2==0) & mds_pecos['Primary specialty'].notnull() & (mds_pecos['Primary specialty']==item), 'bad'] = 1 
-# 
+#     mds_pecos.loc[(mds_pecos.cat2==0) & mds_pecos['Primary specialty'].notnull() & (mds_pecos['Primary specialty']==item), 'bad'] = 1
+#
 # mds_pecos=mds_pecos.query('bad!=1')
-# mds_pecos=mds_pecos.drop(columns=['cat2','bad']) 
-# 
-# 
+# mds_pecos=mds_pecos.drop(columns=['cat2','bad'])
+#
+#
 # group_np_count=groups[['Group Practice PAC ID', 'date']].drop_duplicates().dropna().merge(groups.assign(prim=groups['Primary specialty']).query('prim=="NURSE PRACTITIONER"').groupby(['Group Practice PAC ID', 'date']).size().reset_index().rename(columns={0: 'NPCount'}), how='left').fillna(0).sort_values(['Group Practice PAC ID', 'date']).reset_index(drop=True)
-# 
+#
 # mds_pecos.merge(group_np_count, how='left').assign(NPCount=lambda df: df['NPCount'].fillna(0).astype(int))
-# 
-# s=samhsa_match[['npi','Date','WaiverType']].groupby(['npi','WaiverType']).min().unstack(1).reset_index()        
-# s.columns=['npi','Date30','Date100','Date275']                                                                  
-# 
+#
+# s=samhsa_match[['npi','Date','WaiverType']].groupby(['npi','WaiverType']).min().unstack(1).reset_index()
+# s.columns=['npi','Date30','Date100','Date275']
+#
 # npc = npcounts.reset_index().merge(s, how='left').sort_values(['npi','date']).assign(has_30=lambda df: 1*((df.Date30.notnull()) & (df.date>=pd.to_datetime(df.Date30))),
 #                                                                                      has_100=lambda df: 1*((df.Date100.notnull()) & (df.date>=pd.to_datetime(df.Date100))),
-#                                                                                      has_275=lambda df: 1*((df.Date275.notnull()) & (df.date>=pd.to_datetime(df.Date275)))) 
-# 
+#                                                                                      has_275=lambda df: 1*((df.Date275.notnull()) & (df.date>=pd.to_datetime(df.Date275))))
+#
 
     # samhsa_match_names = final_crosswalk.drop(columns='order').merge(s.names).query('order==1')
     # samhsa_middle_init = samhsa_match_names[samhsa_match_names.middlename.str.len() == 1]
     # samhsa_middle_name = samhsa_match_names[samhsa_match_names.middlename.str.len() > 1]
     # samhsa_no_middle_init = samhsa_match_names[samhsa_match_names.middlename.str.len() == 0]
-# 
+#
     # npi_match_names = final_crosswalk.drop(columns='order').merge(npi.expanded_fullnames).pipe(reconcat_names, 'pfname', 'pmname', 'plname')
     # npi_middle_init = npi_match_names[npi_match_names.pmname_r.str.len() == 1]
     # npi_middle_name = npi_match_names[npi_match_names.pmname_r.str.len() > 1]
-# 
+#
     # pnr = pecos.names.rename(columns={'NPI': 'npi', 'First Name': 'FirstName', 'Middle Name': 'MiddleName', 'Last Name': 'LastName'})
     # pecos_match_names = final_crosswalk.drop(columns='order').merge(pnr).pipe(reconcat_names, 'FirstName', 'MiddleName', 'LastName')
     # pecos_middle_init = pecos_match_names[pecos_match_names['MiddleName_r'].str.len() == 1]
     # pecos_middle_name = pecos_match_names[pecos_match_names['MiddleName_r'].str.len() > 1]
-# 
+#
     # m1 = samhsa_middle_init.merge(npi_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and pmname_r==middlename')[['samhsa_id','npi']].drop_duplicates()
     # m2 = samhsa_middle_init.merge(pecos_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and MiddleName_r==middlename')[['samhsa_id','npi']].drop_duplicates()
-# 
+#
     # nom1 = samhsa_middle_init.merge(npi_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and pmname_r!=middlename')[['samhsa_id','npi']].drop_duplicates()
     # nom2 = samhsa_middle_init.merge(pecos_middle_init, how='outer', on=['samhsa_id','npi'], indicator=True).query('_merge=="both" and MiddleName_r!=middlename')[['samhsa_id','npi']].drop_duplicates()
 
