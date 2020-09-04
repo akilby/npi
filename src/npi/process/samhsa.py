@@ -654,15 +654,15 @@ def final_analysis_dataset(final):
          .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
          .rename(columns={'ptaxcode': 'spec'}))
     t = specs.append(t)
-    t = t[t.spec.isin(t.spec.value_counts()[
-        t.spec.value_counts() > 500].index)]
-    t = (pd.concat([t, pd.get_dummies(t.spec)], axis=1)
-           .drop(columns='spec').groupby('npi').sum())
-    t = (t
-         .reset_index()
-         .merge(final.npi.drop_duplicates(), how='right')
-         .fillna(0))
-    return final, t
+    t2 = t[t.spec.isin(t.spec.value_counts()[
+         t.spec.value_counts() > 500].index)]
+    t2 = (pd.concat([t2, pd.get_dummies(t2.spec)], axis=1)
+            .drop(columns='spec').groupby('npi').sum())
+    t2 = (t2
+          .reset_index()
+          .merge(final.npi.drop_duplicates(), how='right')
+          .fillna(0))
+    return final, t, t2
 
 
 def make_samhsa_waiver_analysis_dataset():
@@ -676,8 +676,8 @@ def make_samhsa_waiver_analysis_dataset():
         group_inferred, locdata)
     counts = c.get_md_np_counts(group_inferred_q_all, practypes)
     final = c.md_copractices(counts, locdata, practypes)
-    final, specializations = c.final_analysis_dataset(final)
-    return final, specializations
+    final, specs_long, specializations = c.final_analysis_dataset(final)
+    return final, specs_long, specializations
 
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
