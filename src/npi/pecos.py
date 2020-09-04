@@ -657,9 +657,13 @@ def get_md_np_counts(group_inferred_q_all, practypes):
                 .groupby(['quarter', groupvar], as_index=False)
                 .sum()
                 .assign(**{groupvar: lambda df: df[groupvar].astype('Int64')}))
-    c1 = get_md_np_counts_single(group_inferred_q_all, practypes, 'Group Practice PAC ID')
-    c2 = get_md_np_counts_single(group_inferred_q_all, practypes, 'my_group_id')
-    c3 = get_md_np_counts_single(group_inferred_q_all, practypes, 'my_group_id_npi')
+
+    c1 = get_md_np_counts_single(
+        group_inferred_q_all, practypes, 'Group Practice PAC ID')
+    c2 = get_md_np_counts_single(
+        group_inferred_q_all, practypes, 'my_group_id')
+    c3 = get_md_np_counts_single(
+        group_inferred_q_all, practypes, 'my_group_id_npi')
 
     counts = (group_inferred_q_all
               .merge(c1, how='left')
