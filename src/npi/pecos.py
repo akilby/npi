@@ -682,8 +682,18 @@ def clean_up_final_information(counts, locdata, practypes):
     counts = counts.query('quarter<"2020-01-01"')
     practypes = practypes.rename(
         columns={'npi': 'NPI', 'MD/DO': 'is_MD', 'NP': 'is_NP'})
-    counts.merge(locdata[['npi', 'quarter', 'plocstatename']])
-
+    # locdata = locdata.assign(quarter=lambda df: df.quarter.dt.to_timestamp())
+    # counts = (counts
+    #           .merge(locdata[['npi', 'quarter', 'plocstatename']]
+    #                  .rename(columns={'npi': 'NPI'}))
+    #           .drop(columns=['Phone Number', 'Zip Code']))
+    counts = counts.merge(practypes)
+    o = (counts
+         .loc[(counts.is_MD == 1)]
+         .groupby(['NPI', 'quarter', 'State'])
+         [['MDDO_gppid',  'NP_gppid',  'MDDO_mgi',  'NP_mgi',
+           'MDDO_mginpi', 'NP_mginpi']].max())
+    return o
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
     # # Should use the same group number if true at different dates
 #
