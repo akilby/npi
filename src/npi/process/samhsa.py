@@ -616,7 +616,8 @@ def final_analysis_dataset(final):
              .drop(columns='level_2')
              .rename(columns={0: 'secondary_spec'}))
 
-    taxcodes = npi.retrieve('ptaxcode')
+    npi.retrieve('ptaxcode')
+    taxcodes = npi.ptaxcode[['npi', 'ptaxcode']]
 
     # waiver dates from new file
     matches = pickle_read(
@@ -625,7 +626,7 @@ def final_analysis_dataset(final):
     samhsa_match = (s.samhsa[['WaiverType', 'samhsa_id', 'Date', 'State']]
                     .drop_duplicates())
     samhsa_match = samhsa_match.merge(matches)
-    sam2 = (samhsa_match[['npi','State', 'Date', 'WaiverType']]
+    sam2 = (samhsa_match[['npi', 'State', 'Date', 'WaiverType']]
             .groupby(['npi', 'State', 'WaiverType'])
             .min()
             .unstack(2)
