@@ -641,7 +641,28 @@ def final_analysis_dataset(final):
     # because I added in the state column, I now lose 884 Mds
     final = final.merge(sam2, how='left')
 
-    return final, taxcodes, specs
+    specs = (specs
+             .set_index('NPI')
+             .stack()
+             .reset_index()
+             .drop(columns='level_1')
+             .drop_duplicates()
+             .rename(columns={0: 'spec', 'NPI': 'npi'})
+             .query('spec!=" "'))
+    specs = specs.merge(final.npi.drop_duplicates())
+    t = (taxcodes
+         .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
+         .rename(columns={'ptaxcode': 'spec'}))
+    t = specs.append(t)
+    t = t[t.spec.isin(t.spec.value_counts()[
+        t.spec.value_counts() > 500].index)]
+    t = (pd.concat([t, pd.get_dummies(t.spec)], axis=1)
+           .drop(columns='spec').groupby('npi').sum())
+    t = (t
+         .reset_index()
+         .merge(final.npi.drop_duplicates(), how='right')
+         .fillna(0))
+    return final, t
 
 
 
