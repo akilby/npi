@@ -665,6 +665,20 @@ def final_analysis_dataset(final):
     return final, t
 
 
+def make_samhsa_waiver_analysis_dataset():
+    from npi.utils.globalcache import c
+    groupinfo, missinggroup = c.group_practices_info_infer()
+    group_inferred, group_count1, group_count2 = c.group_practices_impute(
+        groupinfo, missinggroup)
+    mds_nps, practypes = c.get_mds_nps_info()
+    locdata = c.make_master_enrollee_dataframe(mds_nps)
+    group_inferred_q_all, group_count3 = c.infer_all_group_practices(
+        group_inferred, locdata)
+    counts = c.get_md_np_counts(group_inferred_q_all, practypes)
+    final = c.md_copractices(counts, locdata, practypes)
+    final, specializations = c.final_analysis_dataset(final)
+    return final, specializations
+
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
     #                  write_index=False)
