@@ -646,6 +646,40 @@ def infer_all_group_practices(group_inferred, locdata):
                                    how='outer'))
     return group_inferred_q_all, group_count3
 
+
+def get_md_np_counts(group_inferred_q_all, practypes):
+    def get_md_np_counts_single(group_inferred_q_all, practypes, groupvar):
+        return (group_inferred_q_all[['NPI', 'quarter', groupvar]]
+                .loc[lambda df: df[groupvar].notnull()]
+                .drop_duplicates()
+                .merge(practypes.rename(columns={'npi': 'NPI'}))
+                .drop(columns='NPI')
+                .groupby(['quarter', groupvar], as_index=False)
+                .sum()
+                .assign(**{groupvar: lambda df: df[groupvar].astype('Int64')}))
+    c1 = get_md_np_counts_single(group_inferred_q_all, practypes, 'Group Practice PAC ID')
+    c2 = get_md_np_counts_single(group_inferred_q_all, practypes, 'my_group_id')
+    c3 = get_md_np_counts_single(group_inferred_q_all, practypes, 'my_group_id_npi')
+
+    counts = (group_inferred_q_all
+              .merge(c1, how='left')
+              .merge(c2, how='left', on=['quarter', 'my_group_id'])
+              .merge(c3, how='left', on=['quarter', 'my_group_id_npi']))
+    return counts.rename(columns={'MD/DO_x': 'MDDO_gppid',
+                                  'NP_x': 'NP_gppid',
+                                  'MD/DO_y': 'MDDO_mgi',
+                                  'NP_y': 'NP_mgi',
+                                  'MD/DO': 'MDDO_mginpi',
+                                  'NP': 'NP_mginpi',
+                                  })
+
+
+def clean_up_final_information(counts, locdata, practypes):
+    counts = counts.query('quarter<"2020-01-01"')
+    practypes = practypes.rename(
+        columns={'npi': 'NPI', 'MD/DO': 'is_MD', 'NP': 'is_NP'})
+    counts.merge(locdata[['npi', 'quarter', 'plocstatename']])
+
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
     # # Should use the same group number if true at different dates
 #
