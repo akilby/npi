@@ -512,6 +512,139 @@ def group_practices_impute(groupinfo, missinggroup):
     return group_inferred, group_count1, group_count2
 
 
+def infer_all_group_practices(group_inferred, locdata):
+    """
+    finalizes the group_inferred data from previously, and combines
+    with the NPI-NPPES address data
+    """
+
+    # make NPI-NPPES indicator of group ID
+    locdata = locdata.assign(quarter=lambda df: df.quarter.dt.to_timestamp())
+
+    group_inferred_npi = (locdata
+                          .drop(columns='npi')
+                          .drop_duplicates()
+                          .reset_index(drop=True)
+                          .reset_index()
+                          .assign(my_group_id_npi=lambda df:
+                                  df['index'] + 300000000000)
+                          .drop(columns='index'))
+    group_inferred_npi = locdata.merge(group_inferred_npi)
+
+    group_count3 = (group_inferred_npi[['npi', 'my_group_id_npi', 'quarter']]
+                    .drop_duplicates()
+                    .groupby(['my_group_id_npi', 'quarter'])
+                    .size()
+                    .rename('num_group_members_myid_npi_recalc')
+                    .reset_index())
+
+    # Move group_inferred to quarters, and add in the missing quarters
+    group_inferred_q = (group_inferred
+                        .assign(quarter=lambda df:
+                                pd.PeriodIndex(df.date, freq='Q'))
+                        .assign(quarter=lambda df:
+                                df.quarter.dt.to_timestamp())
+                        [['State', 'Zip Code',
+                          'quarter', 'Phone Number',
+                          'Group Practice PAC ID', 'my_group_id', 'NPI']]
+                        .drop_duplicates())
+
+    timeperiods = [('2013-04-01', '2013-01-01'),
+                   ('2015-04-01', '2015-01-01'),
+                   ('2016-04-01', '2016-01-01'),
+                   ('2017-04-01', '2017-01-01'),
+                   ('2019-10-01', '2019-07-01')]
+
+    addlist = [group_inferred_q.loc[
+               group_inferred_q.quarter == pd.to_datetime(t[0])].assign(
+                quarter=pd.to_datetime(t[1])) for t in timeperiods]
+
+    group_inferred_q = pd.concat([group_inferred_q] + addlist)
+
+    # Grab group info at the NPI-location detail level and just the
+    # location-detail level. This will
+    # be searched for unique group ids, then merged onto the NPI
+    # this is so if, say, a nurse is listed at the same address as a group
+    # practice in the CMS data
+    # we can pick up on it
+    # do this for both the propery group id and my one based on unique
+    # phone-zip-state
+    group_inferred1 = group_inferred_q.loc[
+                        lambda df: df['Phone Number'] != 'nan'][
+                        ['State', 'Zip Code', 'quarter', 'Phone Number',
+                         'Group Practice PAC ID',
+                         'my_group_id', 'NPI']].drop_duplicates()
+    group_inferred2 = group_inferred_q.loc[
+                        lambda df: df['Phone Number'] != 'nan'][
+                        ['State', 'Zip Code', 'quarter',
+                         'Phone Number', 'Group Practice PAC ID',
+                         'my_group_id']].drop_duplicates()
+
+    groups_for_npis = isolate_consistent_info(
+        group_inferred1,
+        ['State', 'Zip Code', 'quarter', 'Phone Number', 'NPI'],
+        'Group Practice PAC ID')
+    other_groups = isolate_consistent_info(
+        group_inferred2,
+        ['State', 'Zip Code', 'quarter', 'Phone Number'],
+        'Group Practice PAC ID')
+
+    groups_for_npis_my = isolate_consistent_info(
+        group_inferred1,
+        ['State', 'Zip Code', 'quarter', 'Phone Number', 'NPI'],
+        'my_group_id')
+    other_groups_my = isolate_consistent_info(
+        group_inferred2,
+        ['State', 'Zip Code', 'quarter', 'Phone Number'],
+        'my_group_id')
+
+    m1 = locdata.merge(
+        groups_for_npis,
+        left_on=locdata.columns.tolist(),
+        right_on=['NPI', 'State', 'Zip Code', 'Phone Number', 'quarter'])
+    m2 = locdata.merge(
+        other_groups,
+        left_on=['plocstatename', 'ploczip', 'ploctel', 'quarter'],
+        right_on=['State', 'Zip Code', 'Phone Number', 'quarter'])
+    m3 = locdata.merge(
+        groups_for_npis_my,
+        left_on=locdata.columns.tolist(),
+        right_on=['NPI', 'State', 'Zip Code', 'Phone Number', 'quarter'])
+    m4 = locdata.merge(
+        other_groups_my,
+        left_on=['plocstatename', 'ploczip', 'ploctel', 'quarter'],
+        right_on=['State', 'Zip Code', 'Phone Number', 'quarter'])
+
+    # append to the inferred groups, since this is more information on the
+    # group id level for the already calculated variables
+    group_inferred_q_all = (
+        group_inferred_q
+        .append(m2
+                .append(m1.drop(columns='NPI'))
+                .merge(m4.append(m3.drop(columns='NPI'))
+                         .assign(my_group_id=lambda df:
+                                 df.my_group_id.astype('Int64')),
+                       how='outer')
+                .rename(columns={'npi': 'NPI'})
+                [[x for x in group_inferred_q.columns]]))
+    group_inferred_q_all = (group_inferred_q_all
+                            .drop_duplicates()
+                            .assign(my_group_id=lambda df:
+                                    df.my_group_id.astype('Int64')))
+
+    # finally, add in group_inferred_npi, which uses only the NPPES to infer
+    # groups, as calculated above
+    group_inferred_q_all = (group_inferred_q_all
+                            .merge(group_inferred_npi
+                                   .rename(columns=dict(
+                                    npi='NPI',
+                                    plocstatename='State',
+                                    ploczip="Zip Code",
+                                    ploctel="Phone Number"))
+                                   .assign(my_group_id_npi=lambda df:
+                                           df.my_group_id_npi.astype('Int64')),
+                                   how='outer'))
+    return group_inferred_q_all, group_count3
 
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
     # # Should use the same group number if true at different dates
