@@ -678,7 +678,7 @@ def get_md_np_counts(group_inferred_q_all, practypes):
                                   })
 
 
-def clean_up_final_information(counts, locdata, practypes):
+def md_copractices(counts, locdata, practypes):
     counts = counts.query('quarter<"2020-01-01"')
     practypes = practypes.rename(
         columns={'npi': 'NPI', 'MD/DO': 'is_MD', 'NP': 'is_NP'})
