@@ -338,6 +338,10 @@ def medical_school(include_web_scraped=True):
 
 
 def group_practices_info_infer():
+    """
+    This is light-touch inferring, actually doesn't do a great job, only
+    reduces missing groups by 11% to 10%
+    """
     # 1. Read in physician compare data
     pecos_groups_loc = PECOS(['NPI', 'Organization legal name',
                               'Group Practice PAC ID',
@@ -469,6 +473,44 @@ def group_practices_info_infer():
     assert groupinfo['Group Practice PAC ID'].isnull().sum() == 0
 
     return groupinfo, missinggroup
+
+
+def group_practices_impute(groupinfo, missinggroup):
+    phones = groupinfo.append(
+        missinggroup).loc[lambda df: df['Phone Number'] != 'nan']
+    nophones = groupinfo.append(
+        missinggroup).loc[lambda df: df['Phone Number'] == 'nan']
+    phones_groupids = (phones[['State', 'Zip Code', 'Phone Number']]
+                       .drop_duplicates()
+                       .reset_index(drop=True)
+                       .reset_index()
+                       .assign(my_group_id=lambda df:
+                               df['index'] + 100000000000)
+                       .drop(columns='index'))
+    nophones_groupids = (nophones[['NPI', 'State', 'Zip Code']]
+                         .drop_duplicates()
+                         .reset_index(drop=True)
+                         .reset_index()
+                         .assign(my_group_id=lambda df:
+                                 df['index'] + 200000000000)
+                         .drop(columns='index'))
+    group_inferred = (phones
+                      .merge(phones_groupids)
+                      .append(nophones.merge(nophones_groupids)))
+    group_count1 = (group_inferred[['NPI', 'Group Practice PAC ID', 'date']]
+                    .drop_duplicates()
+                    .groupby(['Group Practice PAC ID', 'date'])
+                    .size()
+                    .rename('num_group_members_GPPID_recalc')
+                    .reset_index())
+    group_count2 = (group_inferred[['NPI', 'my_group_id', 'date']]
+                    .drop_duplicates()
+                    .groupby(['my_group_id', 'date'])
+                    .size()
+                    .rename('num_group_members_myid_recalc')
+                    .reset_index())
+    return group_inferred, group_count1, group_count2
+
 
 
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
