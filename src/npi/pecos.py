@@ -687,6 +687,7 @@ def md_copractices(counts, locdata, practypes):
     #           .merge(locdata[['npi', 'quarter', 'plocstatename']]
     #                  .rename(columns={'npi': 'NPI'}))
     #           .drop(columns=['Phone Number', 'Zip Code']))
+    # could maybe add in practypes from PECOS...
     counts = counts.merge(practypes)
     o = (counts
          .loc[(counts.is_MD == 1)]
