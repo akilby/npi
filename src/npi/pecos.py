@@ -682,6 +682,10 @@ def md_copractices(counts, locdata, practypes):
     counts = counts.query('quarter<"2020-01-01"')
     practypes = practypes.rename(
         columns={'npi': 'NPI', 'MD/DO': 'is_MD', 'NP': 'is_NP'})
+    # Go ahead and remove the "boths" from is_MD because they mostly loo
+    # like nurses. They count as both nurses and docs in the copractice
+    # variable but won't be in the analysis dataset
+    practypes.loc[practypes.cat == "both", "is_MD"] = 0
     # locdata = locdata.assign(quarter=lambda df: df.quarter.dt.to_timestamp())
     # counts = (counts
     #           .merge(locdata[['npi', 'quarter', 'plocstatename']]
