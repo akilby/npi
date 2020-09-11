@@ -611,6 +611,7 @@ def get_enumdate(src, npis):
 
     enumdate = read_csv_npi(os.path.join(src, 'penumdate.csv'), npis)
     enumdate = enumdate[['npi', 'penumdate']].drop_duplicates()
+    enumdate = enumdate.dropna()
     isid(enumdate, ['npi'])
     return enumdate
 
