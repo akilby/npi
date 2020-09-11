@@ -516,6 +516,10 @@ def infer_all_group_practices(group_inferred, locdata):
     """
     finalizes the group_inferred data from previously, and combines
     with the NPI-NPPES address data
+
+    DOES include NPI nurses (who don't have a PECOS ID) into the PECOS
+    group identifiers. Don't need to only use my_group_id_npi to get that
+    information
     """
 
     # make NPI-NPPES indicator of group ID
