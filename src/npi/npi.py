@@ -713,7 +713,7 @@ def get_taxcode(src, npis, entity, entities,
         taxcode_all = taxcode.copy()
         taxcode_all['month'] = pd.to_datetime(taxcode_all.month)
         taxcode_all = taxcode_all.merge(entity)
-    if not (temporal and entity in [2, [2]]):
+    if not (temporal and entities in [2, [2]]):
         taxcode = taxcode[['npi', 'ptaxcode']].drop_duplicates()
     if entities in [1, [1]] or entities == [1, 2] or entities == [2, 1]:
         taxcode_e1 = (taxcode.merge(entity.query('entity==1')))
