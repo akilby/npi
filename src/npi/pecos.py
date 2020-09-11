@@ -728,6 +728,35 @@ def md_copractices(counts, locdata, practypes):
          [['MDDO_gppid',  'NP_gppid',  'MDDO_mgi',  'NP_mgi',
            'MDDO_mginpi', 'NP_mginpi']].max())
     return o
+
+
+def get_useful_enrollment_dates(final, all_dates):
+    from npi.utils.globalcache import c
+    # some final additions
+    npi = NPI(entities=1)
+    npi.retrieve('penumdate')
+    enumdates = npi.penumdate
+    all_dates = (all_dates
+                 .reset_index()
+                 .rename(columns={'NPI': 'npi'})
+                 .merge(final.npi.drop_duplicates()))
+
+    # get rid of students
+    taxes = c.get_taxcode(
+        npi.src, final.npi.drop_duplicates(),
+        npi.entity, npi.entities, temporal=True)
+
+    early_date = (taxes
+                  .assign(quarter=lambda df:
+                          pd.PeriodIndex(df.month, freq='Q'))
+                  .assign(quarter=lambda df:
+                          df.quarter.dt.to_timestamp())
+                  [['npi', 'ptaxcode', 'quarter']]
+                  .drop_duplicates().sort_values(['npi', 'quarter'])
+                  .query('ptaxcode!="390200000X"')
+                  .groupby('npi')['quarter'].min())
+    return enumdates, all_dates, early_date
+
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
     # # Should use the same group number if true at different dates
 #

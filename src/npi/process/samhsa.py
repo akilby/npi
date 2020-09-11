@@ -678,22 +678,9 @@ def make_samhsa_waiver_analysis_dataset():
     counts = c.get_md_np_counts(group_inferred_q_all, practypes)
     final = c.md_copractices(counts, locdata, practypes)
     final, specs_long, specializations = c.final_analysis_dataset(final)
-
-    # some final additions
-    npi = NPI(entities=1)
-    npi.retrieve('penumdate')
-    enumdates = npi.penumdate
-    all_dates = (all_dates
-                 .reset_index()
-                 .rename(columns={'NPI': 'npi'})
-                 .merge(final.npi.drop_duplicates()))
-
-    # get rid of students
-    taxes = c.get_taxcode(
-        npi.src, final.npi.drop_duplicates(),
-        npi.entity, npi.entities, temporal=True)
-
-    return final, specs_long, specializations, enumdates, all_dates
+    enumdates, all_dates, early_date = c.get_useful_enrollment_dates(
+        final, all_dates)
+    return final, specs_long, specializations, enumdates, all_dates, early_date
 
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
