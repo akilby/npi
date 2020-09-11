@@ -670,9 +670,10 @@ def make_samhsa_waiver_analysis_dataset():
     groupinfo, missinggroup = c.group_practices_info_infer()
     group_inferred, group_count1, group_count2 = c.group_practices_impute(
         groupinfo, missinggroup)
-    mds_nps, practypes = c.get_mds_nps_info()
+    mds_nps, practypes = c.mds_nps_practype_npi_pecos()
     locdata = c.make_master_enrollee_dataframe(mds_nps)
-    group_inferred_q_all, group_count3 = c.infer_all_group_practices(
+    (group_inferred_q_all, group_count3,
+        pecos_dates, all_dates) = c.infer_all_group_practices(
         group_inferred, locdata)
     counts = c.get_md_np_counts(group_inferred_q_all, practypes)
     final = c.md_copractices(counts, locdata, practypes)

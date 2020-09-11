@@ -12,6 +12,7 @@ from functools import reduce
 
 import pandas as pd
 from npi.constants import USE_VAR_LIST_DICT
+from npi.utils.utils import isid
 # from download.medical_schools import sanitize_web_medical_schools
 from utility_data.taxonomies import provider_taxonomies
 
@@ -154,6 +155,12 @@ class NPI(object):
         from .utils.globalcache import c
         self.pcredentialoth = c.get_cred(
             self.src, self.npis, self.entity, 'pcredentialoth')
+
+    def get_penumdate(self):
+        if hasattr(self, 'penumdate'):
+            return
+        from .utils.globalcache import c
+        self.penumdate = c.get_enumdate(self.src, self.npis)
 
     def get_PLICSTATE(self):
         if hasattr(self, 'PLICSTATE'):
@@ -593,6 +600,19 @@ def get_gender(src, npis, entity):
     gender = (gender.merge(entity.query('entity==1')).drop(columns=['entity']))
     assert gender.npi.is_unique
     return gender
+
+
+def get_enumdate(src, npis):
+    """
+    Retrieves penumdate
+    Any entity type
+    Returns non-temporal data
+    """
+
+    enumdate = read_csv_npi(os.path.join(src, 'penumdate.csv'), npis)
+    enumdate = enumdate[['npi', 'penumdate']].drop_duplicates()
+    isid(enumdate, ['npi'])
+    return enumdate
 
 
 def get_nameoth(src, npis, entity, name_stub):

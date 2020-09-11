@@ -573,6 +573,7 @@ def infer_all_group_practices(group_inferred, locdata):
     # we can pick up on it
     # do this for both the propery group id and my one based on unique
     # phone-zip-state
+    # Expands the group_inferred_q dataset by about 8 percent
     group_inferred1 = group_inferred_q.loc[
                         lambda df: df['Phone Number'] != 'nan'][
                         ['State', 'Zip Code', 'quarter', 'Phone Number',
@@ -638,7 +639,8 @@ def infer_all_group_practices(group_inferred, locdata):
 
     # finally, add in group_inferred_npi, which uses only the NPPES to infer
     # groups, as calculated above
-    group_inferred_q_all = (group_inferred_q_all
+    # This expands by another 35 percent
+    group_inferred_qall2 = (group_inferred_q_all
                             .merge(group_inferred_npi
                                    .rename(columns=dict(
                                     npi='NPI',
@@ -648,7 +650,23 @@ def infer_all_group_practices(group_inferred, locdata):
                                    .assign(my_group_id_npi=lambda df:
                                            df.my_group_id_npi.astype('Int64')),
                                    how='outer'))
-    return group_inferred_q_all, group_count3
+    group_inferred_qall2 = (group_inferred_qall2
+                            .assign(NPI=lambda df: df.NPI.astype(int)))
+
+    # Get pecos dates of involvement
+    pecos_dates = (group_inferred_q[['NPI', 'quarter']]
+                   .groupby('NPI')
+                   .min()
+                   .merge(group_inferred_q[['NPI', 'quarter']]
+                          .groupby('NPI').max(),
+                          left_index=True, right_index=True))
+    all_dates = (group_inferred_qall2[['NPI', 'quarter']]
+                 .groupby('NPI')
+                 .min()
+                 .merge(group_inferred_qall2[['NPI', 'quarter']]
+                        .groupby('NPI').max(),
+                        left_index=True, right_index=True))
+    return group_inferred_qall2, group_count3, pecos_dates, all_dates
 
 
 def get_md_np_counts(group_inferred_q_all, practypes):
