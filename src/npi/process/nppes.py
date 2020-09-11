@@ -363,7 +363,7 @@ def main_single():
     main_process_variable(variable, update)
 
 
-def update_all(max_jobs=6, exclude=[], include=[]):
+def update_all(max_jobs=6, exclude=[], include=[], update=True):
     """Must be run on a login node, submits multiple jobs"""
     assert not (exclude != [] and include != [])
     from jobs.run import RunScript
@@ -384,7 +384,7 @@ def update_all(max_jobs=6, exclude=[], include=[]):
             u = varl.pop(0)
             print(f'Running: {u}')
             commands = ('from npi.process.nppes import main_process_variable\n'
-                        'main_process_variable("%s", True)' % u)
+                        'main_process_variable("%s", %s)' % (u, update))
             r = RunScript(commands, program='python', partition='reservation',
                           reservation='kilby', procs=26).run()
             list_of_jobs.append(r)

@@ -75,7 +75,7 @@ class CommandLine(object):
             else:
                 print('updating all variables except', args.exclude)
                 update_all(max_jobs=args.max_jobs, exclude=args.exclude,
-                           include=args.include)
+                           include=args.include, update=args.update)
 
 
 def main():
