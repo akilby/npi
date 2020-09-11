@@ -1037,14 +1037,116 @@ def make_master_enrollee_dataframe(enrollee_subset,
     return locdata
 
 
-def get_mds_nps_info():
+def mds_nps_practype_npi_pecos():
+    """
+    This cleans and sanitizes the practitioner type such that I include
+    information
+    from both the NPI and PECOS on a practitioner's type, especially since
+    there
+    were a number of miscoded NPs as MDs.
+    """
+
     npi = NPI(entities=1)
     npi.retrieve('practitioner_type')
     # get about 1.5 million MDs and NPs
     s = npi.practitioner_type.set_index('npi')[['MD/DO', 'NP']].sum(axis=1) > 0
     mds_nps = s[s].reset_index().drop(columns=0)
     practypes = npi.practitioner_type.merge(mds_nps)[['npi', 'MD/DO', 'NP']]
-    return mds_nps, practypes
+
+    md_np_cred = (npi
+                  .credentials
+                  .query('cat=="MD/DO" or cat=="NP"')[['npi', 'cat']]
+                  .drop_duplicates())
+    md_np_cred_both = md_np_cred[md_np_cred.npi.duplicated(keep=False)]
+    md_np_cred = md_np_cred[~md_np_cred.npi.duplicated(keep=False)]
+    practypes = practypes.merge(md_np_cred, how='left')
+
+    pecos = PECOS(['NPI', 'Last Name', 'First Name', 'Middle Name',
+                   'Suffix', 'State', 'Zip Code', 'Phone Number'])
+    pecos.retrieve('practitioner_type')
+    # 1. Select MD/DO and NPs from either NPI or PECOS
+    practitioners = pecos.practitioner_type
+    mddo = (practitioners
+            .query('Credential=="MD/DO" or '
+                   'Credential=="MD" or Credential=="DO"')
+            .NPI.drop_duplicates())
+    nps = (practitioners.loc[(practitioners['Primary specialty']
+                              == "NURSE PRACTITIONER")
+                             | (practitioners['Credential'] == 'NP')]
+           .NPI.drop_duplicates())
+
+    pecos_practypes = (pd
+                       .DataFrame(mddo.astype('Int64'))
+                       .assign(MDDO=1)
+                       .merge(pd.DataFrame(nps.astype('Int64')).assign(NP=1),
+                              how='outer')
+                       .fillna(0)
+                       .set_index('NPI')
+                       .astype('int')
+                       .reset_index())
+
+    practypes = (practypes
+                 .assign(NPI=practypes.npi.astype('Int64'))
+                 .rename(columns={'MD/DO': 'MDDO'})
+                 .drop(columns='npi'))
+
+    m = practypes.merge(pecos_practypes, how='outer')
+    practypes_c = (m[~m.NPI.duplicated(keep=False)]
+                   .query('(MDDO==1 & NP==1)==0')
+                   .query('(cat=="NP" & MDDO==1)==0')
+                   .query('(cat=="MD/DO" & NP==1)==0'))
+    practypes_c.loc[practypes_c.MDDO == 1, 'cat'] = "MD/DO"
+    practypes_c.loc[practypes_c.NP == 1, 'cat'] = "NP"
+
+    sums = (m
+            .merge(practypes_c, how='left', indicator=True)
+            .query('_merge=="left_only"')
+            .drop(columns="_merge")
+            .sort_values('NPI')
+            .groupby('NPI', as_index=False)
+            .sum()
+            .merge(md_np_cred.rename(columns={'npi': 'NPI'})))
+
+    additions = (sums
+                 .query('NP==1 & (MDDO==1 | MDDO==2) & cat=="MD/DO"')
+                 .assign(MDDO=1, NP=0)
+                 .append(sums
+                         .query('MDDO==1 & (NP==1 | NP==2) & cat=="NP"')
+                         .assign(MDDO=0, NP=1))
+                 .drop_duplicates())
+    practypes_c = practypes_c.append(additions).drop_duplicates()
+    isid(practypes_c, ['NPI'])
+
+    final_adds = (m
+                  .merge(practypes_c.NPI, how='left', indicator=True)
+                  .query('_merge=="left_only"')
+                  .drop(columns="_merge")
+                  .sort_values('NPI').groupby('NPI', as_index=False)
+                  .sum()
+                  .loc[lambda df: ~df.NPI.isin(md_np_cred_both.npi)])
+    final_adds.loc[lambda df: df.MDDO > df.NP, 'cat']='MD/DO'
+    final_adds.loc[lambda df: df.MDDO < df.NP, 'cat']='NP'
+    final_adds.loc[final_adds.cat == 'NP', 'NP'] = 1
+    final_adds.loc[final_adds.cat == 'NP', 'MDDO'] = 0
+    final_adds.loc[final_adds.cat == 'MD/DO', 'MDDO'] = 1
+    final_adds.loc[final_adds.cat == 'MD/DO', 'NP'] = 0
+    practypes_c = practypes_c.append(final_adds.dropna())
+    both = (final_adds
+            .loc[final_adds.cat.isnull()]
+            .append(pd.DataFrame(md_np_cred_both.npi
+                                 .rename('NPI')
+                                 .drop_duplicates())))
+    practypes_c = practypes_c.append(both.assign(MDDO=1, NP=1, cat="both"))
+    isid(practypes_c, ['NPI'])
+
+    assert (mds_nps.npi.append(mddo).append(nps).drop_duplicates().shape[0]
+            == practypes_c.NPI.drop_duplicates().shape[0])
+
+    practypes_c = (practypes_c
+                   .rename(columns={'NPI': 'npi', 'MDDO': 'MD/DO'})
+                   [['npi',  'MD/DO',  'NP', 'cat']])
+    mds_nps = practypes_c[['npi']]
+    return mds_nps, practypes_c
 
 
 def make_master_group_practice_dataframe(groupinfo,
