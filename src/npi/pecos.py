@@ -520,6 +520,10 @@ def infer_all_group_practices(group_inferred, locdata):
     DOES include NPI nurses (who don't have a PECOS ID) into the PECOS
     group identifiers. Don't need to only use my_group_id_npi to get that
     information
+
+    Note, this weirdly leaves in all of PECOS (including chiropractors etc)
+    whereas in locdata, the NPI only has mds_nps and not other practitioners
+    Shoulndn't matter though.
     """
 
     # make NPI-NPPES indicator of group ID
