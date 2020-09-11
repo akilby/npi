@@ -524,6 +524,9 @@ def infer_all_group_practices(group_inferred, locdata):
     Note, this weirdly leaves in all of PECOS (including chiropractors etc)
     whereas in locdata, the NPI only has mds_nps and not other practitioners
     Shoulndn't matter though.
+
+    all_dates will have a mixture of types, and will thus be weird for non-mds
+    and nps
     """
 
     # make NPI-NPPES indicator of group ID
