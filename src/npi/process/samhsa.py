@@ -1,6 +1,6 @@
 import pandas as pd
 from cache.utils.utils import pickle_read
-from npi.npi import NPI, convert_practitioner_data_to_long
+from npi.npi import NPI, convert_practitioner_data_to_long, provider_taxonomies
 from npi.pecos import PECOS
 from npi.samhsa import SAMHSA
 from npi.utils.utils import isid
@@ -654,6 +654,37 @@ def final_analysis_dataset(final):
          .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
          .rename(columns={'ptaxcode': 'spec'}))
     t = specs.append(t)
+
+    # new
+    taxes = (t.merge(provider_taxonomies(),
+                     left_on='spec', right_on='TaxonomyCode')
+             [['npi', 'spec', 'Classification']]
+             .drop_duplicates()
+             .dropna()
+             .append(t.merge(provider_taxonomies(),
+                     left_on='spec', right_on='TaxonomyCode')
+                      .query('Specialization!="General Practice"')
+                     [['npi', 'spec', 'Specialization']]
+                     .drop_duplicates()
+                     .dropna()
+                     .rename(columns={'Specialization': 'Classification'}))
+             .sort_values(['npi', 'spec', 'Classification'])
+             .assign(spec=lambda df: df.Classification.str.upper().str.strip())
+             )
+    taxes.loc[lambda df: df.spec.str.endswith(' -'),
+              'spec'] = (taxes
+                         .loc[lambda df: df.spec.str.endswith(' -')]
+                         .spec.str.replace(' -', ''))
+    taxes = taxes.drop(columns='Classification')
+    taxes = (t
+             .merge(provider_taxonomies(),
+                    how='left', left_on='spec',
+                    right_on='TaxonomyCode', indicator=True)
+             .query('_merge=="left_only"')[['npi', 'spec']]
+             .append(taxes)
+             .drop_duplicates())
+    t = taxes.copy()
+
     t2 = t[t.spec.isin(t.spec.value_counts()[
          t.spec.value_counts() > 500].index)]
     t2 = (pd.concat([t2, pd.get_dummies(t2.spec)], axis=1)

@@ -6,7 +6,6 @@ import time
 import numpy as np
 import pandas as pd
 import requests
-from bs4 import BeautifulSoup
 
 from ..npi import NPI
 from ..utils.utils import longprint
@@ -25,6 +24,7 @@ final_data_path = '/work/akilby/npi/data/medical_schools/medical_schools.csv'
 class HTMLTableParser:
 
     def parse_url(self, read_path, save_path=None):
+        from bs4 import BeautifulSoup
         if read_path.startswith('http'):
             response = requests.get(read_path)
             soup = BeautifulSoup(response.text, 'lxml')
