@@ -718,7 +718,7 @@ def final_analysis_dataset(final):
           .reset_index()
           .merge(final.npi.drop_duplicates(), how='right')
           .fillna(0))
-    return final, t2
+    return final, allspec, t2
 
 
 def make_samhsa_waiver_analysis_dataset():
