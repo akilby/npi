@@ -730,6 +730,70 @@ def md_copractices(counts, locdata, practypes):
     return o
 
 
+def get_urbrurs(group_inferred_q_all, final, use_four_digit_impute=True):
+    """
+    Adds urbrur dummies for NCHSUR2013. a person-state-quarter can have a dummy
+    equalling one for more than one urbrur code, because if they have
+    a listing in multiple zip codes with multiple codes, this will identify
+    them
+
+    Haven't added RUCA codes, only the county categories
+    """
+    from utility_data.crosswalks import zcta5_to_county_fips
+    from utility_data.classifications import urbrur_county
+    urb = urbrur_county().merge(zcta5_to_county_fips())
+    # urb_z = urbrur_zcta5()
+    nchsur2013 = (group_inferred_q_all
+                  .assign(ZCTA5=lambda df: df['Zip Code'].str[:5])
+                  .merge(urb)
+                  [['NPI', 'quarter', 'State', 'NCHSUR2013']])
+    nchsur2013 = nchsur2013.drop_duplicates().dropna()
+    nchsur2013 = (pd
+                  .concat([nchsur2013,
+                           pd.get_dummies(nchsur2013.NCHSUR2013)], axis=1)
+                  .drop(columns='NCHSUR2013')
+                  .groupby(['NPI', 'quarter', 'State']).sum())
+    nchsur2013.columns = [f'NCHSUR2013_{x}' for x in range(1, 7)]
+
+    mastr = final[['npi', 'quarter', 'State']].drop_duplicates()
+    nchsur2013 = nchsur2013.merge(
+        mastr, left_index=True, right_on=['npi', 'quarter', 'State'],
+        how='right')
+    if use_four_digit_impute:
+        fillin = nchsur2013[nchsur2013[[x for x in nchsur2013.columns
+                                        if x.startswith('NCHS')]].sum(1) == 0]
+        fillin = fillin[['npi', 'quarter', 'State']]
+        fillin = group_inferred_q_all.merge(
+            fillin, left_on=['NPI', 'quarter', 'State'],
+            right_on=['npi', 'quarter', 'State'])
+        urbfour = (urb
+                   .assign(four=urb.ZCTA5.str[:4])[['four', 'NCHSUR2013']]
+                   .drop_duplicates())
+        fillin = (fillin
+                  .assign(four=lambda df: df['Zip Code'].str[:4])
+                  .merge(urbfour)[['npi', 'State', 'quarter', 'NCHSUR2013']]
+                  .drop_duplicates())
+        fillin = (pd
+                  .concat([fillin,
+                           pd.get_dummies(fillin.NCHSUR2013)], axis=1)
+                  .drop(columns='NCHSUR2013')
+                  .groupby(['npi', 'quarter', 'State']).sum())
+        fillin.columns = [f'NCHSUR2013_{x}' for x in range(1, 7)]
+        nchsur2013 = (nchsur2013[nchsur2013[[x for x in nchsur2013.columns
+                                             if x.startswith('NCHS')]]
+                      .sum(1) > 0]
+                      .append(fillin.reset_index()))
+        nchsur2013 = nchsur2013.merge(mastr, how='right')
+
+    nchsur2013 = (nchsur2013
+                  .fillna(0)
+                  .set_index(['npi', 'quarter', 'State'])
+                  .astype(int)
+                  .reset_index())
+
+    return final.merge(nchsur2013)
+
+
 def get_useful_enrollment_dates(final, all_dates):
     """
     Returns enumeration date, and the earliest date

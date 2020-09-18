@@ -738,6 +738,7 @@ def make_samhsa_waiver_analysis_dataset():
     final, specs_long, specializations = c.final_analysis_dataset(final)
     enumdates, all_dates, earliest_date = c.get_useful_enrollment_dates(
         final, all_dates)
+    final = c.get_urbrurs(group_inferred_q_all, final)
     return (final, specs_long, specializations,
             enumdates, all_dates, earliest_date)
 
