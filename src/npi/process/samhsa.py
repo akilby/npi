@@ -650,50 +650,75 @@ def final_analysis_dataset(final):
              .rename(columns={0: 'spec', 'NPI': 'npi'})
              .query('spec!=" "'))
     specs = specs.merge(final.npi.drop_duplicates())
-    t = (taxcodes
-         .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
-         .rename(columns={'ptaxcode': 'spec'}))
-    t = specs.append(t)
+
+    taxcodes = taxcodes.merge(final.npi.drop_duplicates())
+    tax_desc = (taxcodes
+                .merge(provider_taxonomies(),
+                       left_on='ptaxcode', right_on='TaxonomyCode')
+                [['npi', 'ptaxcode', 'Classification', 'Specialization']]
+                .set_index(['npi', 'ptaxcode'])
+                .stack()
+                .reset_index()
+                .drop(columns='level_2')
+                .rename(columns={0: 'spec'})
+                .assign(spec=lambda df: df.spec.str.upper()))
+    tax_desc.loc[lambda df: df.spec.str.endswith(' -'),
+                 'spec'] = (tax_desc
+                            .loc[lambda df: df.spec.str.endswith(' -')]
+                            .spec.str.replace(' -', ''))
+    tax_desc = (tax_desc[~((tax_desc
+                            .ptaxcode
+                            .isin(provider_taxonomies()
+                                  .query('Specialization=="General Practice"')
+                                  .TaxonomyCode) &
+                            (tax_desc.spec == 'GENERAL PRACTICE')))])
+
+    allspec = specs.append(tax_desc.drop(columns='ptaxcode')).drop_duplicates()
+
+    # t = (taxcodes
+    #      .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
+    #      .rename(columns={'ptaxcode': 'spec'}))
+    # t = specs.append(t)
 
     # new
-    taxes = (t.merge(provider_taxonomies(),
-                     left_on='spec', right_on='TaxonomyCode')
-             [['npi', 'spec', 'Classification']]
-             .drop_duplicates()
-             .dropna()
-             .append(t.merge(provider_taxonomies(),
-                     left_on='spec', right_on='TaxonomyCode')
-                      .query('Specialization!="General Practice"')
-                     [['npi', 'spec', 'Specialization']]
-                     .drop_duplicates()
-                     .dropna()
-                     .rename(columns={'Specialization': 'Classification'}))
-             .sort_values(['npi', 'spec', 'Classification'])
-             .assign(spec=lambda df: df.Classification.str.upper().str.strip())
-             )
-    taxes.loc[lambda df: df.spec.str.endswith(' -'),
-              'spec'] = (taxes
-                         .loc[lambda df: df.spec.str.endswith(' -')]
-                         .spec.str.replace(' -', ''))
-    taxes = taxes.drop(columns='Classification')
-    taxes = (t
-             .merge(provider_taxonomies(),
-                    how='left', left_on='spec',
-                    right_on='TaxonomyCode', indicator=True)
-             .query('_merge=="left_only"')[['npi', 'spec']]
-             .append(taxes)
-             .drop_duplicates())
-    t = taxes.copy()
+    # taxes = (t.merge(provider_taxonomies(),
+    #                  left_on='spec', right_on='TaxonomyCode')
+    #          [['npi', 'spec', 'Classification']]
+    #          .drop_duplicates()
+    #          .dropna()
+    #          .append(t.merge(provider_taxonomies(),
+    #                  left_on='spec', right_on='TaxonomyCode')
+    #                   .query('Specialization!="General Practice"')
+    #                  [['npi', 'spec', 'Specialization']]
+    #                  .drop_duplicates()
+    #                  .dropna()
+    #                  .rename(columns={'Specialization': 'Classification'}))
+    #          .sort_values(['npi', 'spec', 'Classification'])
+    #          .assign(spec=lambda df: df.Classification.str.upper().str.strip())
+    #          )
+    # taxes.loc[lambda df: df.spec.str.endswith(' -'),
+    #           'spec'] = (taxes
+    #                      .loc[lambda df: df.spec.str.endswith(' -')]
+    #                      .spec.str.replace(' -', ''))
+    # taxes = taxes.drop(columns='Classification')
+    # taxes = (t
+    #          .merge(provider_taxonomies(),
+    #                 how='left', left_on='spec',
+    #                 right_on='TaxonomyCode', indicator=True)
+    #          .query('_merge=="left_only"')[['npi', 'spec']]
+    #          .append(taxes)
+    #          .drop_duplicates())
+    # t = taxes.copy()
 
-    t2 = t[t.spec.isin(t.spec.value_counts()[
-         t.spec.value_counts() > 500].index)]
+    t2 = allspec[allspec.spec.isin(allspec.spec.value_counts()[
+         allspec.spec.value_counts() > 500].index)]
     t2 = (pd.concat([t2, pd.get_dummies(t2.spec)], axis=1)
             .drop(columns='spec').groupby('npi').sum())
     t2 = (t2
           .reset_index()
           .merge(final.npi.drop_duplicates(), how='right')
           .fillna(0))
-    return final, t, t2
+    return final, t2
 
 
 def make_samhsa_waiver_analysis_dataset():
