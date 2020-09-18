@@ -731,6 +731,10 @@ def md_copractices(counts, locdata, practypes):
 
 
 def get_useful_enrollment_dates(final, all_dates):
+    """
+    Returns enumeration date, and the earliest date
+    we think they weren't a student, earliest_date
+    """
     from npi.utils.globalcache import c
     # some final additions
     npi = NPI(entities=1)
@@ -746,16 +750,16 @@ def get_useful_enrollment_dates(final, all_dates):
         npi.src, final.npi.drop_duplicates(),
         npi.entity, npi.entities, temporal=True)
 
-    early_date = (taxes
-                  .assign(quarter=lambda df:
-                          pd.PeriodIndex(df.month, freq='Q'))
-                  .assign(quarter=lambda df:
-                          df.quarter.dt.to_timestamp())
-                  [['npi', 'ptaxcode', 'quarter']]
-                  .drop_duplicates().sort_values(['npi', 'quarter'])
-                  .query('ptaxcode!="390200000X"')
-                  .groupby('npi')['quarter'].min())
-    return enumdates, all_dates, early_date
+    earliest_date = (taxes
+                     .assign(quarter=lambda df:
+                             pd.PeriodIndex(df.month, freq='Q'))
+                     .assign(quarter=lambda df:
+                             df.quarter.dt.to_timestamp())
+                     [['npi', 'ptaxcode', 'quarter']]
+                     .drop_duplicates().sort_values(['npi', 'quarter'])
+                     .query('ptaxcode!="390200000X"')
+                     .groupby('npi')['quarter'].min())
+    return enumdates, all_dates, earliest_date
 
     # # If there are no other NPIs at a date-state-zip-phone, this is a new group
     # # Should use the same group number if true at different dates

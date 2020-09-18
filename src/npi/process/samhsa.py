@@ -674,7 +674,9 @@ def final_analysis_dataset(final):
                             (tax_desc.spec == 'GENERAL PRACTICE')))])
 
     allspec = specs.append(tax_desc.drop(columns='ptaxcode')).drop_duplicates()
-
+    allspec.loc[lambda df: df.spec == 'PREVENTATIVE MEDICINE',
+                'spec']='PREVENTIVE MEDICINE'
+    allspec = allspec.assign(spec=lambda df: df.spec.str.strip())
     # t = (taxcodes
     #      .merge(final[~final.npi.isin(specs.npi)].npi.drop_duplicates())
     #      .rename(columns={'ptaxcode': 'spec'}))
@@ -734,9 +736,10 @@ def make_samhsa_waiver_analysis_dataset():
     counts = c.get_md_np_counts(group_inferred_q_all, practypes)
     final = c.md_copractices(counts, locdata, practypes)
     final, specs_long, specializations = c.final_analysis_dataset(final)
-    enumdates, all_dates, early_date = c.get_useful_enrollment_dates(
+    enumdates, all_dates, earliest_date = c.get_useful_enrollment_dates(
         final, all_dates)
-    return final, specs_long, specializations, enumdates, all_dates, early_date
+    return (final, specs_long, specializations,
+            enumdates, all_dates, earliest_date)
 
 
     # copracs.to_stata('/work/akilby/Analysis/samhsa_master_analysis_data2.dta',
