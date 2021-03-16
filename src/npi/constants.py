@@ -29,6 +29,8 @@ PART_B_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_b'
 
 PART_D_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_d'
 
+PART_D_RAW_DIR_NEW = '/work/akilby/npi/raw_medicare/medicare_part_d_new'
+
 PART_D_OPI_RAW_DIR = '/work/akilby/npi/raw_medicare/medicare_part_d_opioids'
 
 PART_B_STUB_SUM = ('Medicare_Physician_and_Other_Supplier_National_Provider'

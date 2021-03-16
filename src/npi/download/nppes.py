@@ -130,9 +130,16 @@ def main():
     if not os.path.isdir(RAW_DATA_DIR):
         os.makedirs(RAW_DATA_DIR)
 
-    # Download single-variable files from NBER
+    # Single-variable files from NBER
     params = [(x, y, z) for z in USE_VAR_LIST for x, y in nppes_month_list()]
-    result_list = {x: wget_nber(*x) for x in params}
+
+    # Old: download from NBER
+    # result_list = {x: wget_nber(*x) for x in params}
+
+    # New: just list what is downloaded, since NBER has broken
+    result_list = {x: True if f'{x[2]}{x[0]}{x[1]}.csv'
+                   in os.listdir('/work/akilby/npi/raw/')
+                   else False for x in params}
 
     # Process failed downloads
     results, missing_months = process_fail_list(result_list)

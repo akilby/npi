@@ -42,19 +42,29 @@ import re
 
 from ..constants import (API_SOURCE_PATH, PART_B_RAW_DIR, PART_B_STUB,
                          PART_B_STUB_SUM, PART_D_OPI_RAW_DIR, PART_D_OPI_STUB,
-                         PART_D_RAW_DIR, PART_D_SOURCE_PATH)
+                         PART_D_RAW_DIR, PART_D_RAW_DIR_NEW,
+                         PART_D_SOURCE_PATH)
 from ..utils.utils import singleton, unzip_checkfirst, wget_checkfirst
 
 
 def list_part_d_files(Drug=True, destination_dir=PART_D_RAW_DIR):
     drugfiles = glob.glob(destination_dir + '/*_DRUG_*/*.txt')
-    if Drug:
-        files = drugfiles
+    if destination_dir == PART_D_RAW_DIR:
+        if Drug:
+            files = drugfiles
+        else:
+            allfiles = glob.glob(destination_dir + '/*/*.txt')
+            files = [x for x in allfiles if x not in drugfiles]
+        return [(x, 2000 + int(singleton(set(re.findall(r'[0-9][0-9]', x)))))
+                for x in files]
     else:
-        allfiles = glob.glob(destination_dir + '/*/*.txt')
-        files = [x for x in allfiles if x not in drugfiles]
-    return [(x, 2000 + int(singleton(set(re.findall(r'[0-9][0-9]', x)))))
-            for x in files]
+        files = glob.glob(destination_dir + '/*')
+        files_sum = glob.glob(destination_dir + '/*Summary*')
+        files = [x for x in files if x not in files_sum]
+        if Drug:
+            return [(x, int(singleton(set(re.findall(r'[0-9][0-9][0-9][0-9]', x))))) for x in files]
+        else:
+            return [(x, int(singleton(set(re.findall(r'[0-9][0-9][0-9][0-9]', x))))) for x in files_sum]
 
 
 def get_part_d_data(yearrange=range(13, 19),
@@ -85,12 +95,37 @@ def list_part_b_files(filestub, destination_dir=PART_B_RAW_DIR):
             in glob.glob(os.path.join(destination_dir, filestub) + '*.csv')]
 
 
-def get_part_b_data(yearrange=range(2012, 2018),
+def get_part_d_data_new(yearrange=range(2013, 2019),
+                        source_path=API_SOURCE_PATH,
+                        destination_dir=PART_D_RAW_DIR_NEW):
+    file_id_dict_puf_npi_drug = {2018: 'mhdd-npjx',
+                                 2017: '77gb-8z53',
+                                 2016: 'yvpj-pmj2',
+                                 2015: '3z4d-vmhm',
+                                 2014: '465c-49pb',
+                                 2013: '4uvc-gbfz'}
+    file_id_dict_puf_npi = {2018: 'icvy-hptt',
+                            2017: 'psut-35i4',
+                            2016: 'c9xz-7zpd',
+                            2015: 'qywy-pajd',
+                            2014: 'mxq9-aiiw',
+                            2013: 'cks9-s5d9'}
+
+    already_gotten = [x[1] for x in list_part_d_files(Drug=True, destination_dir=destination_dir)]
+    [wget_checkfirst(source_path % x, to_dir=destination_dir)
+     for y, x in file_id_dict_puf_npi_drug.items() if y not in already_gotten]
+    already_gotten = [x[1] for x in list_part_d_files(Drug=False, destination_dir=destination_dir)]
+    [wget_checkfirst(source_path % x, to_dir=destination_dir)
+     for y, x in file_id_dict_puf_npi.items() if y not in already_gotten]
+
+
+def get_part_b_data(yearrange=range(2012, 2019),
                     source_path=API_SOURCE_PATH,
                     destination_dir=PART_B_RAW_DIR):
     """
     """
-    file_id_dict_puf = {2017: 'fs4p-t5eq',
+    file_id_dict_puf = {2018: 'hczc-ufy5',
+                        2017: 'fs4p-t5eq',
                         2016: 'utc4-f9xp',
                         2015: 'sk9b-znav',
                         2014: 'ee7f-sh97',
@@ -102,7 +137,8 @@ def get_part_b_data(yearrange=range(2012, 2018),
     [wget_checkfirst(source_path % x, to_dir=destination_dir)
      for y, x in file_id_dict_puf.items() if y not in already_gotten]
 
-    file_id_prof_sum = {2017: 'n5qc-ua94',
+    file_id_prof_sum = {2018: '5fr6-cch3',
+                        2017: 'n5qc-ua94',
                         2016: '85jw-maq9',
                         2015: 'p3uv-6dv4',
                         2014: '4a3h-46r6',
