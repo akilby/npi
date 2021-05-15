@@ -4,11 +4,12 @@ from tributaries.config import get_config_package
 name = __name__.split('.')[0]
 directory, noisily, rerun = get_config_package(name)
 
-# Directory: '/work/akilby/npi/Cache/Caches'
-
-c = cache.Cache(directory=directory,
+c = cache.Cache(directory='/work/akilby/npi/Cache/Caches',
                 noisily=noisily,
                 rerun=rerun,
                 exclusion_list=[],
-                registry=['npi.npi'],
+                registry=['npi.npi',
+                          'npi.pecos',
+                          'npi.process.samhsa',
+                          'npi.process.physician_compare'],
                 old_version=False)
