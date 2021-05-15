@@ -10,5 +10,5 @@ c = cache.Cache(directory=directory,
                 noisily=noisily,
                 rerun=rerun,
                 exclusion_list=[],
-                registry=[name],
+                registry=['npi.npi'],
                 old_version=False)
