@@ -1,9 +1,9 @@
 import pandas as pd
-from cache.utils.utils import pickle_read
 from npi.npi import NPI, convert_practitioner_data_to_long, provider_taxonomies
 from npi.pecos import PECOS
 from npi.samhsa import SAMHSA
 from npi.utils.utils import isid
+from utils.loaders import pickle_read
 
 
 def getcol(df, src, idvar, col, newname):
