@@ -1,7 +1,7 @@
 from tributaries import cache
 from tributaries.config import config_path, load_config_package
 
-print(__name__)
+print(__name__.split('.')[0])
 noisily, rerun = load_config_package(config_path(name='npi'))
 
 
