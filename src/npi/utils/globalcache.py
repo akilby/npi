@@ -1,10 +1,16 @@
-from cache import cache
-from cache.config import config_path, load_config_package
+from tributaries import cache
+from tributaries.config import config_path, load_config_package
 
+print(__name__)
 noisily, rerun = load_config_package(config_path(name='npi'))
-c = cache.Cache(noisily=noisily,
-                rerun=rerun)
 
+
+c = cache.Cache(configure={'directory': '/work/akilby/npi/Cache/Caches',
+                           'registry': [__name__],
+                           'exclusion_list': []},
+                noisily=noisily,
+                rerun=rerun,
+                old_version=False)
 
 # If cache installation is being used for multiple purposes, need
 # a separate configuration file
