@@ -6,9 +6,9 @@ directory, noisily, rerun = get_config_package(name)
 
 # Directory: '/work/akilby/npi/Cache/Caches'
 
-c = cache.Cache(configure={'directory': directory,
-                           'registry': [__name__],
-                           'exclusion_list': []},
+c = cache.Cache(directory=directory,
                 noisily=noisily,
                 rerun=rerun,
+                exclusion_list=[],
+                registry=[name],
                 old_version=False)
