@@ -1,9 +1,7 @@
 from tributaries import cache
-from tributaries.config import config_path, get_config_package
+from tributaries.config import get_config_package
 
 name = __name__.split('.')[0]
-print(name)
-print(config_path(name=name))
 directory, noisily, rerun = get_config_package(name)
 
 # Directory: '/work/akilby/npi/Cache/Caches'
