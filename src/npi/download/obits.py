@@ -9,7 +9,7 @@ import sys
 
 from googleapiclient.discovery import build
 from npi.npi import NPI
-from project_management.helper import pickle_dump
+from utils.loaders import pickle_dump
 
 __author__ = 'a.kilby@northeastern.edu'
 service = build("customsearch",

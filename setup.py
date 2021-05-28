@@ -10,7 +10,7 @@ setup(name='npi',
       packages=find_packages('src'),
       include_package_data=True,
       package_dir={'': 'src'},
-      install_requires=['pandas'],
+      install_requires=['pandas', 'numpy', 'requests', 'wget', 'google-api-python-client'],
       zip_safe=False,
       entry_points={
         'console_scripts': [
