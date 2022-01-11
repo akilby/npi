@@ -1,6 +1,6 @@
 # NPI
 
-The NPI package manages known publicly-available data on physicians and other health care workers that is linked to their NPI number.
+The NPI package manages known publicly-available data on physicians and other health care workers that is linked to their NPI number. One contribution is a novel NPI linkage to SAMHSA waiver data on providers eligible to prescribe buprenorphine.
 
 
 ### Using the main download module
@@ -24,7 +24,7 @@ To process only certain variables:
 
 ```bash
 npi process --source NPPES --update True --include npideactdate npireactdate
-
+````
 
 To process everything except a list of variables:
 
@@ -38,9 +38,3 @@ See an example notebook here:
 
 [NPI Database Query Example](https://github.com/akilby/npi/blob/master/NPI%20Database%20Query%20Example.ipynb)
 
-
-### Old
-
-```bash
-python -m npi.download.nppes
-```
