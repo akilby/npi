@@ -10,8 +10,11 @@ setup(name='npi',
       packages=find_packages('src'),
       include_package_data=True,
       package_dir={'': 'src'},
-      install_requires=['pandas', 'numpy', 'requests', 'wget',
-                        'google-api-python-client'],
+      install_requires=['pandas', 'numpy', 'requests', 'tqdm',
+                        # 'google-api-python-client',
+                        'tributaries @ git+https://github.com/akilby/'
+                        'tributary-cache@master#egg=tributaries'
+                        ],
       zip_safe=False,
       entry_points={
         'console_scripts': [

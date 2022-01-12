@@ -1,6 +1,6 @@
 # NPI
 
-The NPI package manages known publicly-available data on physicians and other health care workers that is linked to their NPI number. One contribution is a novel NPI linkage to SAMHSA waiver data on providers eligible to prescribe buprenorphine.
+The NPI package manages publicly-available data on physicians and other health care workers that is linked to their NPI number. It focuses on providing longitudinal data where available. One contribution is a novel NPI linkage to SAMHSA waiver data on providers eligible to prescribe buprenorphine.
 
 
 ### Using the main download module

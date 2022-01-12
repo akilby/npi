@@ -4,14 +4,16 @@ import glob
 import os
 import sys
 import urllib
+import urllib.request
 import warnings
 import zipfile
 import zlib
 from pprint import pprint
+from urllib.request import urlopen
 
 import pandas as pd
 import requests
-import wget
+from tqdm import tqdm
 
 
 def hasher(thing):
@@ -59,6 +61,51 @@ def wget_checkfirst(url, to_dir, destructive=False):
             print('Failed')
             return None
     return destination_path
+
+
+def download_checkfirst(url, output_path, destructive=False):
+    """
+    Downloads a download path to output_path, checking first
+    if that filename exists in that path
+
+    Does not overwrite unless destructive=True
+    """
+    try:
+        filename = detect_filename(url)
+    except(urllib.error.HTTPError):
+        print('Failed')
+        return None
+    if os.path.isdir(output_path):
+        output_path = os.path.join(output_path, filename)
+
+    if os.path.isfile(output_path) and not destructive:
+        print('File already downloaded to: %s' % output_path)
+    else:
+        print('Downloading url: %s' % url)
+        try:
+            download_url(url, output_path)
+        except(urllib.error.HTTPError):
+            print('Failed')
+            return None
+    return output_path
+
+
+def detect_filename(url):
+    response = urlopen(url)
+    return os.path.basename(response.url)
+
+
+class DownloadProgressBar(tqdm):
+    def update_to(self, b=1, bsize=1, tsize=None):
+        if tsize is not None:
+            self.total = tsize
+        self.update(b * bsize - self.n)
+
+
+def download_url(url, output_path):
+    with DownloadProgressBar(unit='B', unit_scale=True,
+                             miniters=1, desc=url.split('/')[-1]) as t:
+        urllib.request.urlretrieve(url, filename=output_path, reporthook=t.update_to)
 
 
 def unzip(path, to_dir):

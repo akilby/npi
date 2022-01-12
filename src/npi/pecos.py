@@ -8,6 +8,12 @@ people can move to private practice..."
 could also try; retire them when they hit retirement age, unless evidence
 they still practice
 
+Can get group practice information here:
+https://www.ahrq.gov/chsp/data-resources/compendium-2018.html
+
+Article on using PECOS:
+https://www.healthaffairs.org/do/10.1377/forefront.20201222.615286/full/
+
 """
 
 import numpy as np

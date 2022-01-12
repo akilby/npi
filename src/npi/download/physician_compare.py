@@ -1,3 +1,62 @@
+"""
+https://data.cms.gov/provider-data/topics/doctors-clinicians
+
+These are the official datasets used on Medicare.gov provided by the Centers
+for Medicare & Medicaid Services. These datasets give you useful information
+about doctors, clinicians, and groups listed on Medicare Care Compare.
+
+General information about doctors and clinicians in the Provider Data Catalog
+and on Medicare Care Compare profile pages comes primarily from the Provider,
+Enrollment, Chain, and Ownership System (PECOS) and is checked against Medicare
+claims data. This information is updated twice a month.
+
+For a clinician or group's information to appear on Care Compare, they must
+have:
+
+Current and “approved” Medicare enrollment records in PECOS
+A valid physical practice location or address
+A valid specialty
+A National Provider Identifier (NPI) for a clinician
+At least one Medicare Fee-for-Service claim within the last six months for a
+    clinician
+At least two approved clinicians reassigning their benefits to the group
+
+
+https://data.cms.gov/provider-data/archived-data/doctors-clinicians
+
+https://wayback.archive-it.org/org-551/20160104131342/https://data.medicare.gov/data/archives/physician-compare
+
+The Medicare Fee-For-Service Public Provider Enrollment (PPEF) dataset includes
+information on providers who are actively approved to bill Medicare or have
+completed the 855O at the time the data was pulled from the Provider Enrollment
+and Chain Ownership System (PECOS). The release of this provider enrollment
+data is not related to other provider information releases such as Physician
+Compare or Data Transparency.
+
+https://data.cms.gov/provider-characteristics/medicare-provider-supplier-enrollment/medicare-fee-for-service-public-provider-enrollment
+
+https://data.cms.gov/resources/fee-for-service-public-provider-enrollment-methodology
+
+https://www.nber.org/research/data/medicare-fee-service-public-provider-enrollment-data
+
+You’re required to revalidate—or renew—your enrollment record periodically to
+maintain Medicare billing privileges. In general, providers and suppliers
+revalidate every five years but DMEPOS suppliers revalidate every three years.
+CMS also reserves the right to request off-cycle revalidations.
+
+https://www.cms.gov/Medicare/Provider-Enrollment-and-Certification/Revalidations
+
+The Provider Enrollment data will be published on
+https://data.cms.gov/public-provider-enrollment and will be updated on a
+quarterly basis. The initial data will consist of individual and organization
+provider and supplier enrollment information similar to what is on Physician
+Compare; however, it will be directly from PECOS and will only be updated
+through updates to enrollment information.
+
+https://www.cms.gov/newsroom/fact-sheets/public-provider-and-supplier-enrollment-files
+
+"""
+
 import os
 import re
 
